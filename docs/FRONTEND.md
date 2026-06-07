@@ -45,6 +45,12 @@
   forms libs. Add them in Phase 2 when connecting to Directus.
 - **2026-06-06:** No heavy UI kit (NativeBase/Tamagui). Use existing themed primitives to
   avoid locking in styling before seeing the layout.
+- **2026-06-06:** Installed `node_modules` had drifted to SDK 55 versions while
+  `package.json` was pinned to SDK 54. Did a clean reinstall (deleted `node_modules` +
+  `package-lock.json`, fresh `npm install`) to realign all runtime packages to SDK 54 so
+  the app loads in Expo Go on the maintainer's phone. Confirmed working via
+  `exp://<LAN-IP>:8081`. Only remaining mismatch is `@types/react` (dev-only types, no
+  runtime impact).
 
 ## Status
 
