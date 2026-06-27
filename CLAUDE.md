@@ -45,7 +45,9 @@ Expo Router with file-based routing. The root `_layout.tsx` is a `Stack` (wrappe
 Route groups (`(tabs)`, `(quote)`) don't appear in the URL, so the tab paths stay `/` and `/explore`.
 The quote flow shares one draft via `QuoteDraftProvider` (`src/context/quote-draft.tsx`) — each step
 reads/writes the same `QuoteDraft` instead of threading params. Derived values (area, materials/labour
-totals) live alongside it. Shared flow UI: `quote-step-screen`, `step-progress`, `step-footer`.
+totals) live alongside it. Shared flow UI: `quote-step-screen`, `step-progress`, `step-footer`. The
+Materials step's tiered packages come from `src/constants/materials-mock.ts`, a Phase-1 mock shaped to
+the eventual Directus response (swapped for the real call in Phase 3 without UI changes).
 
 ### Platform-specific files
 

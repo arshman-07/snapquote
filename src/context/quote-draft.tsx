@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
-import { MATERIAL_CATALOG, type Unit } from '@/constants/quote';
+import { type Unit } from '@/constants/quote';
+import { buildMaterialPackages, type MaterialTier } from '@/constants/materials-mock';
 
 // The single draft the whole wizard reads from and writes to. Dimensions are
 // kept as raw strings so the TextInputs stay controlled while the user types
@@ -14,8 +15,12 @@ export type QuoteDraft = {
   // Phase 1 has no real camera capture — this just records that the user
   // tapped through the (placeholder) photo step.
   photoAdded: boolean;
-  // IDs from MATERIAL_CATALOG that the user selected.
-  selectedMaterialIds: string[];
+  // Free-text description of the work, fed to the (future) AI material lookup.
+  materialBrief: string;
+  // Optional US ZIP for regional pricing (placeholder in Phase 1).
+  materialZip: string;
+  // Which of the three material packages the user picked.
+  selectedTier: MaterialTier | null;
   // Labour is priced as days on site × a daily rate (USD).
   labourDays: string;
   labourDayRate: string;
@@ -28,7 +33,9 @@ const INITIAL_DRAFT: QuoteDraft = {
   width: '',
   height: '',
   photoAdded: false,
-  selectedMaterialIds: [],
+  materialBrief: '',
+  materialZip: '',
+  selectedTier: null,
   labourDays: '',
   labourDayRate: '',
 };
@@ -37,8 +44,6 @@ type QuoteDraftContextValue = {
   draft: QuoteDraft;
   // Merge a partial update into the draft.
   updateDraft: (patch: Partial<QuoteDraft>) => void;
-  // Toggle a material on/off in the selection.
-  toggleMaterial: (id: string) => void;
   // Clear everything (e.g. after finishing or abandoning a quote).
   reset: () => void;
 };
@@ -53,22 +58,11 @@ export function QuoteDraftProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const toggleMaterial = useCallback(
-    (id: string) =>
-      setDraft((d) => ({
-        ...d,
-        selectedMaterialIds: d.selectedMaterialIds.includes(id)
-          ? d.selectedMaterialIds.filter((m) => m !== id)
-          : [...d.selectedMaterialIds, id],
-      })),
-    [],
-  );
-
   const reset = useCallback(() => setDraft(INITIAL_DRAFT), []);
 
   const value = useMemo(
-    () => ({ draft, updateDraft, toggleMaterial, reset }),
-    [draft, updateDraft, toggleMaterial, reset],
+    () => ({ draft, updateDraft, reset }),
+    [draft, updateDraft, reset],
   );
 
   return <QuoteDraftContext.Provider value={value}>{children}</QuoteDraftContext.Provider>;
@@ -92,10 +86,15 @@ export function getArea(draft: QuoteDraft): number | null {
 }
 
 export function getMaterialsTotal(draft: QuoteDraft): number {
-  return MATERIAL_CATALOG.filter((m) => draft.selectedMaterialIds.includes(m.id)).reduce(
-    (sum, m) => sum + m.unitPrice,
-    0,
-  );
+  if (!draft.selectedTier) return 0;
+  // Rebuild the packages from the draft (deterministic) and take the chosen
+  // tier's subtotal, so materials cost stays in sync if dimensions change.
+  const pkg = buildMaterialPackages({
+    jobType: draft.jobType,
+    area: getArea(draft),
+    unit: draft.unit,
+  }).find((p) => p.tier === draft.selectedTier);
+  return pkg?.subtotal ?? 0;
 }
 
 export function getLabourTotal(draft: QuoteDraft): number {

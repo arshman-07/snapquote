@@ -7,12 +7,15 @@ for their customers. The user describes a job (room dimensions, job type, option
 a photo of the area), the app uses AI to determine the materials needed and their
 prices, factors in the company's own labour rate, and outputs a rough total quote.
 
+**Market:** launches in the **US** — currency is **USD**, US units preferred.
+
 ## Core quote flow
 
 1. **Enter dimensions** — user inputs room/area dimensions and job/room type.
-2. **AI material estimation** — AI determines the material types needed and their prices.
-3. **Material cost** — app produces a rough material subtotal.
-4. **Labour** — user sets/updates their labour rate; it's factored into the quote.
+2. **AI material estimation** — AI returns **three itemized packages** (budget / standard /
+   premium) with explanations + buy links; the user picks one.
+3. **Material cost** — the chosen package's subtotal feeds the quote.
+4. **Labour** — user enters **days on site × a daily rate (USD)**; it's factored into the quote.
 5. **Photo estimation (optional)** — user snaps a photo of the area; AI refines or adds
    to the estimate based on the image.
 6. **Quote summary** — a rough total, broken down (materials + labour), shown to the customer.
@@ -51,6 +54,6 @@ prices, factors in the company's own labour rate, and outputs a rough total quot
 
 - [x] Project vision & stack decided
 - [x] Documentation structure created
-- [ ] Phase 1: frontend placeholder shell
+- [~] Phase 1: frontend placeholder shell — Dimensions, Materials, Labour built; Photo + Summary in progress
 - [ ] Phase 2: Directus integration
 - [ ] Phase 3: AI estimation
