@@ -13,10 +13,18 @@ as the starting point of a quote.
 
 ## Phase 1 (placeholders)
 
-- [ ] Build the New Quote form screen with these inputs.
-- [ ] Static unit toggle + job-type picker with sample options.
-- [ ] No validation library yet — basic/visual only.
-- [ ] "Next" advances to the (placeholder) materials/estimation step.
+- [x] Build the New Quote form screen with these inputs. (`src/app/(quote)/new-quote.tsx`)
+- [x] Static unit toggle (ft/m) + job-type picker with sample options.
+- [x] No validation library yet — basic/visual only (Continue disabled until job type + valid area).
+- [x] "Continue" advances to the Photo step (`router.push('/photo')`), then the rest of the flow.
+      The whole wizard now walks end-to-end; later steps are stubs being filled in one at a time.
+
+Reached via a "Start a new quote" button on the Home screen (`src/app/(tabs)/index.tsx`).
+Live floor-area preview (length × width) shown once both are valid. Height is optional.
+
+Inputs are written into the shared `QuoteDraft` (`src/context/quote-draft.tsx`) so the materials,
+labour, and summary steps can size up the quote from them. Built on the shared flow chrome
+(`quote-step-screen`, `step-progress`, `step-footer`).
 
 ## Later
 
@@ -30,4 +38,6 @@ as the starting point of a quote.
 
 ## Status
 
-- [ ] Not started
+- [x] Phase 1 Dimensions screen built (static placeholders), wired into the multi-step quote flow.
+- [~] Steps 2–5 (Photo / Materials / Labour / Summary) stubbed on shared chrome; content in progress.
+- Open questions below still need product answers.

@@ -26,18 +26,34 @@
 
 | Screen | Purpose | Status |
 |---|---|---|
-| New Quote | Form for dimensions + room/job type | ⬜ Not started |
-| Photo capture | Take/upload an image of the area (placeholder) | ⬜ Not started |
-| Materials | List of materials + prices (sample data) | ⬜ Not started |
-| Labour | Input/set labour rate | ⬜ Not started |
-| Quote summary | Rough total, broken down (materials + labour) | ⬜ Not started |
+| New Quote (Dimensions) | Form for dimensions + room/job type | ✅ Built (Phase 1) |
+| Photo capture | Take/upload an image of the area (placeholder) | 🟨 Stub (chrome + wiring) |
+| Materials | List of materials + prices (sample data) | 🟨 Stub (chrome + wiring) |
+| Labour | Input/set labour rate | 🟨 Stub (chrome + wiring) |
+| Quote summary | Rough total, broken down (materials + labour) | 🟨 Stub (chrome + wiring) |
 | Saved quotes | List of past quotes | ⬜ Later |
+
+> All five flow screens exist and walk end-to-end. Steps 2–5 currently render placeholder
+> bodies on the shared chrome; their full content is being filled in one screen at a time.
+
+## Quote flow architecture
+
+- The wizard lives in the `(quote)` route group, presented as a **modal Stack** over the tabs.
+- Order: **Dimensions → Photo → Materials → Labour → Summary**. "Done" clears the draft and
+  returns home via `router.dismissTo('/index')`.
+- **Shared state:** `QuoteDraftProvider` (`src/context/quote-draft.tsx`) holds one `QuoteDraft`
+  (dimensions, photo flag, selected material IDs, labour). Steps read/write it via `useQuoteDraft()`
+  — no param threading, no global store (respects the Phase-1 "no zustand yet" rule). Derived
+  values (area, materials/labour/total) are exported helpers alongside it.
+- **Shared UI:** `quote-step-screen` (chrome), `step-progress` (the "Step N of 5" bar), `step-footer`
+  (Back / primary action). Sample data + £ formatting live in `src/constants/quote.ts`.
 
 ## Navigation
 
-- Current scaffold has **Home** + **Explore** tabs.
-- Plan: repurpose into quote-focused navigation (e.g. **Quotes** + **New Quote**).
-  Exact tab structure TBD once screens are laid out.
+- Tabs (**Home** + **Explore**) now live under the `(tabs)` group; a root `Stack` hosts both the
+  tabs and the `(quote)` flow so the wizard can present over them. URLs unchanged (`/`, `/explore`).
+- Still TBD: repurposing the tabs into quote-focused nav (e.g. **Quotes** + **New Quote**) — left
+  as-is for now.
 
 ## Decisions log
 
@@ -45,6 +61,13 @@
   forms libs. Add them in Phase 2 when connecting to Directus.
 - **2026-06-06:** No heavy UI kit (NativeBase/Tamagui). Use existing themed primitives to
   avoid locking in styling before seeing the layout.
+- **2026-06-27:** Root navigator changed from "tabs as root" to a root `Stack` hosting `(tabs)` +
+  `(quote)`. The old structure left non-tab routes (the quote flow) with nowhere to render, so the
+  "Start a new quote" button did nothing. Tabs moved into a `(tabs)` group; URLs unchanged.
+- **2026-06-27:** Quote-flow state shared via a React Context (`QuoteDraftProvider`) scoped to the
+  `(quote)` group — deliberately a built-in context, not `zustand`, to honour the Phase-1 rule.
+- **2026-06-27:** Added one `Accent` colour (`#3c87f7`, reusing the existing link blue) for primary
+  actions + the step-progress bar, to lift the flow above flat grey without a new palette.
 - **2026-06-06:** Installed `node_modules` had drifted to SDK 55 versions while
   `package.json` was pinned to SDK 54. Did a clean reinstall (deleted `node_modules` +
   `package-lock.json`, fresh `npm install`) to realign all runtime packages to SDK 54 so
@@ -54,5 +77,5 @@
 
 ## Status
 
-- [ ] Phase 1: placeholder screens built with sample data
-- [ ] Phase 1: navigation repurposed for quote flow
+- [~] Phase 1: placeholder screens built with sample data — Dimensions done; Photo/Materials/Labour/Summary stubbed on shared chrome, content in progress
+- [x] Phase 1: navigation restructured to a root Stack so the quote flow can present over the tabs

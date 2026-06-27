@@ -1,5 +1,6 @@
+import { useRouter } from 'expo-router';
 import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { Platform, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimatedIcon } from '@/components/animated-icon';
@@ -29,6 +30,7 @@ function getDevMenuHint() {
 }
 
 export default function HomeScreen() {
+  const router = useRouter();
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -37,6 +39,15 @@ export default function HomeScreen() {
           <ThemedText type="title" style={styles.title}>
             Welcome to&nbsp;Expo
           </ThemedText>
+
+          {/* Entry point into the quote flow — opens the dimensions-input screen. */}
+          <Pressable
+            onPress={() => router.push('/new-quote')}
+            style={({ pressed }) => pressed && styles.pressed}>
+            <ThemedView type="backgroundSelected" style={styles.ctaButton}>
+              <ThemedText type="smallBold">Start a new quote</ThemedText>
+            </ThemedView>
+          </Pressable>
         </ThemedView>
 
         <ThemedText type="code" style={styles.code}>
@@ -84,6 +95,14 @@ const styles = StyleSheet.create({
   },
   title: {
     textAlign: 'center',
+  },
+  ctaButton: {
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.three,
+    borderRadius: Spacing.five,
+  },
+  pressed: {
+    opacity: 0.7,
   },
   code: {
     textTransform: 'uppercase',

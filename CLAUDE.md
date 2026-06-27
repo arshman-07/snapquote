@@ -4,6 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @AGENTS.md
 
+## Code comments
+
+When writing code, add comments that explain what's going on. Keep them moderate —
+not an essay, not a single cryptic word. The goal is that the maintainer can skim the
+code and understand what each part is doing and why. Comment the intent of non-obvious
+blocks, not every line.
+
 ## Commands
 
 ```bash
@@ -25,10 +32,20 @@ All application code lives under `src/`. The TypeScript path alias `@/*` maps to
 
 ### Routing
 
-Expo Router with file-based routing. Route files are in `src/app/`:
-- `_layout.tsx` — root layout; wraps the app in `ThemeProvider` and renders `AnimatedSplashOverlay` + `AppTabs`
-- `index.tsx` — Home tab
-- `explore.tsx` — Explore tab
+Expo Router with file-based routing. The root `_layout.tsx` is a `Stack` (wrapped in
+`ThemeProvider` + `AnimatedSplashOverlay`) so the tabs and the quote flow are siblings:
+
+- `src/app/_layout.tsx` — root `Stack`; hosts `(tabs)` and `(quote)` (the latter presented as a modal)
+- `src/app/(tabs)/_layout.tsx` — renders `AppTabs`
+  - `(tabs)/index.tsx` — Home tab (`/`)
+  - `(tabs)/explore.tsx` — Explore tab (`/explore`)
+- `src/app/(quote)/_layout.tsx` — `Stack` wrapped in `QuoteDraftProvider`; the multi-step quote wizard
+  - `new-quote.tsx` (`/new-quote`) → `photo.tsx` → `materials.tsx` → `labour.tsx` → `summary.tsx`
+
+Route groups (`(tabs)`, `(quote)`) don't appear in the URL, so the tab paths stay `/` and `/explore`.
+The quote flow shares one draft via `QuoteDraftProvider` (`src/context/quote-draft.tsx`) — each step
+reads/writes the same `QuoteDraft` instead of threading params. Derived values (area, materials/labour
+totals) live alongside it. Shared flow UI: `quote-step-screen`, `step-progress`, `step-footer`.
 
 ### Platform-specific files
 
@@ -44,6 +61,7 @@ Web overrides use the `.web.tsx` suffix and are resolved automatically by Metro.
 - `Fonts` — platform-specific font family map (`sans`, `serif`, `rounded`, `mono`)
 - `Spacing` — numeric scale (`half`=2 … `six`=64)
 - `BottomTabInset`, `MaxContentWidth` — layout constants
+- `Accent` — single brand blue (`#3c87f7`) for primary actions / progress in the quote flow
 
 Use `useTheme()` (`src/hooks/use-theme.ts`) to get the active color object. `ThemedText` and `ThemedView` are the primary styled primitives and accept a `themeColor` prop keyed to `ThemeColor`.
 

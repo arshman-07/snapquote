@@ -63,3 +63,8 @@ export const Spacing = {
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
+
+// Single brand accent, reused for primary actions and progress in the quote
+// flow. Matches the existing `linkPrimary` blue so we don't introduce a new
+// colour into the otherwise-neutral palette.
+export const Accent = '#3c87f7';
