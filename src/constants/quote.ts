@@ -41,7 +41,12 @@ export const MATERIAL_CATALOG: Material[] = [
 export const QUOTE_STEPS = ['Dimensions', 'Photo', 'Materials', 'Labour', 'Summary'] as const;
 export const QUOTE_STEP_COUNT = QUOTE_STEPS.length;
 
-// Currency helper so every screen formats money the same way.
+// Quick-pick daily labour rates (USD). Illustrative US trade day rates; the
+// user can always type a custom figure on the Labour step.
+export const LABOUR_RATE_PRESETS = [300, 450, 600] as const;
+
+// Currency helper so every screen formats money the same way. USD — the app
+// launches in the US.
 export function formatMoney(amount: number): string {
-  return `£${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  return `$${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }

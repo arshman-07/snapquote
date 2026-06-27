@@ -29,12 +29,13 @@
 | New Quote (Dimensions) | Form for dimensions + room/job type | ✅ Built (Phase 1) |
 | Photo capture | Take/upload an image of the area (placeholder) | 🟨 Stub (chrome + wiring) |
 | Materials | List of materials + prices (sample data) | 🟨 Stub (chrome + wiring) |
-| Labour | Input/set labour rate | 🟨 Stub (chrome + wiring) |
+| Labour | Days on site × daily rate (USD) | ✅ Built (Phase 1) |
 | Quote summary | Rough total, broken down (materials + labour) | 🟨 Stub (chrome + wiring) |
 | Saved quotes | List of past quotes | ⬜ Later |
 
-> All five flow screens exist and walk end-to-end. Steps 2–5 currently render placeholder
-> bodies on the shared chrome; their full content is being filled in one screen at a time.
+> All five flow screens exist and walk end-to-end. Dimensions and Labour are built; Photo,
+> Materials, and Summary still render placeholder bodies on the shared chrome and are being
+> filled in one screen at a time.
 
 ## Quote flow architecture
 
@@ -46,7 +47,7 @@
   — no param threading, no global store (respects the Phase-1 "no zustand yet" rule). Derived
   values (area, materials/labour/total) are exported helpers alongside it.
 - **Shared UI:** `quote-step-screen` (chrome), `step-progress` (the "Step N of 5" bar), `step-footer`
-  (Back / primary action). Sample data + £ formatting live in `src/constants/quote.ts`.
+  (Back / primary action). Sample data + USD (`$`) formatting live in `src/constants/quote.ts`.
 
 ## Navigation
 
@@ -68,6 +69,9 @@
   `(quote)` group — deliberately a built-in context, not `zustand`, to honour the Phase-1 rule.
 - **2026-06-27:** Added one `Accent` colour (`#3c87f7`, reusing the existing link blue) for primary
   actions + the step-progress bar, to lift the flow above flat grey without a new palette.
+- **2026-06-27:** App launches in the **US** → currency is **USD** (`formatMoney` uses `$`). Labour is
+  priced as **days × daily rate** (not hourly). Still TODO: localize the materials catalogue units
+  (`per m²`/`per litre` → `per sq ft`/`per gallon`) when the Materials step is built.
 - **2026-06-06:** Installed `node_modules` had drifted to SDK 55 versions while
   `package.json` was pinned to SDK 54. Did a clean reinstall (deleted `node_modules` +
   `package-lock.json`, fresh `npm install`) to realign all runtime packages to SDK 54 so
@@ -77,5 +81,5 @@
 
 ## Status
 
-- [~] Phase 1: placeholder screens built with sample data — Dimensions done; Photo/Materials/Labour/Summary stubbed on shared chrome, content in progress
+- [~] Phase 1: placeholder screens built with sample data — Dimensions + Labour done; Photo/Materials/Summary stubbed on shared chrome, content in progress
 - [x] Phase 1: navigation restructured to a root Stack so the quote flow can present over the tabs

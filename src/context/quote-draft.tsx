@@ -16,8 +16,9 @@ export type QuoteDraft = {
   photoAdded: boolean;
   // IDs from MATERIAL_CATALOG that the user selected.
   selectedMaterialIds: string[];
-  labourHours: string;
-  labourRate: string;
+  // Labour is priced as days on site × a daily rate (USD).
+  labourDays: string;
+  labourDayRate: string;
 };
 
 const INITIAL_DRAFT: QuoteDraft = {
@@ -28,8 +29,8 @@ const INITIAL_DRAFT: QuoteDraft = {
   height: '',
   photoAdded: false,
   selectedMaterialIds: [],
-  labourHours: '',
-  labourRate: '',
+  labourDays: '',
+  labourDayRate: '',
 };
 
 type QuoteDraftContextValue = {
@@ -98,9 +99,9 @@ export function getMaterialsTotal(draft: QuoteDraft): number {
 }
 
 export function getLabourTotal(draft: QuoteDraft): number {
-  const hours = parseFloat(draft.labourHours);
-  const rate = parseFloat(draft.labourRate);
-  return hours > 0 && rate > 0 ? hours * rate : 0;
+  const days = parseFloat(draft.labourDays);
+  const rate = parseFloat(draft.labourDayRate);
+  return days > 0 && rate > 0 ? days * rate : 0;
 }
 
 export function getQuoteTotal(draft: QuoteDraft): number {
