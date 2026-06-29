@@ -30,12 +30,11 @@
 | Photo capture | Take/upload an image of the area (placeholder) | 🟨 Stub (chrome + wiring) |
 | Materials | Brief → 3 tiered packages (budget/standard/premium) | ✅ Built (Phase 1, mock data) |
 | Labour | Days on site × daily rate (USD) | ✅ Built (Phase 1) |
-| Quote summary | Rough total, broken down (materials + labour) | 🟨 Stub (chrome + wiring) |
+| Quote summary | Rough total, broken down (materials + labour) | ✅ Built (Phase 1) |
 | Saved quotes | List of past quotes | ⬜ Later |
 
-> All five flow screens exist and walk end-to-end. Dimensions, Materials, and Labour are built;
-> Photo and Summary still render placeholder bodies on the shared chrome and are being filled in
-> one screen at a time.
+> All five flow screens exist and walk end-to-end. Dimensions, Materials, Labour, and Summary are
+> built; Photo still renders a placeholder body on the shared chrome and is being filled in next.
 
 ## Quote flow architecture
 
@@ -58,6 +57,13 @@
 
 ## Decisions log
 
+- **2026-06-29:** Summary step built — a receipt-style breakdown: job recap (room + floor area),
+  the chosen material package's itemized line items (read-only, no buy links) + materials subtotal,
+  a `days × rate/day` labour line + labour subtotal, then a headline accent grand total and a
+  freshness/disclaimer line. Empty sections degrade gracefully ("No materials selected" / "No labour
+  added"). Added a `getSelectedPackage(draft)` helper to `quote-draft.tsx` (rebuilds packages
+  deterministically, returns the chosen tier) so Summary can read the package's items/title;
+  `getMaterialsTotal` now reuses it. Done still `reset()`s + `dismissTo('/index')`.
 - **2026-06-06:** Phase 1 is static placeholders only — no SDK, no TanStack Query, no
   forms libs. Add them in Phase 2 when connecting to Directus.
 - **2026-06-06:** No heavy UI kit (NativeBase/Tamagui). Use existing themed primitives to
@@ -85,5 +91,5 @@
 
 ## Status
 
-- [~] Phase 1: placeholder screens built with sample data — Dimensions + Materials + Labour done; Photo/Summary stubbed on shared chrome, content in progress
+- [~] Phase 1: placeholder screens built with sample data — Dimensions + Materials + Labour + Summary done; Photo stubbed on shared chrome, content next
 - [x] Phase 1: navigation restructured to a root Stack so the quote flow can present over the tabs

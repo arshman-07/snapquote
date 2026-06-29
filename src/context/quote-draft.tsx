@@ -1,7 +1,11 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
 import { type Unit } from '@/constants/quote';
-import { buildMaterialPackages, type MaterialTier } from '@/constants/materials-mock';
+import {
+  buildMaterialPackages,
+  type MaterialPackage,
+  type MaterialTier,
+} from '@/constants/materials-mock';
 
 // The single draft the whole wizard reads from and writes to. Dimensions are
 // kept as raw strings so the TextInputs stay controlled while the user types
@@ -85,16 +89,23 @@ export function getArea(draft: QuoteDraft): number | null {
   return length > 0 && width > 0 ? length * width : null;
 }
 
+// The chosen material package, rebuilt deterministically from the draft so it
+// stays in sync if dimensions change. Null until the user picks a tier. The
+// Summary step uses this for the package's line items + title; the totals
+// helpers below reuse it for the subtotal.
+export function getSelectedPackage(draft: QuoteDraft): MaterialPackage | null {
+  if (!draft.selectedTier) return null;
+  return (
+    buildMaterialPackages({
+      jobType: draft.jobType,
+      area: getArea(draft),
+      unit: draft.unit,
+    }).find((p) => p.tier === draft.selectedTier) ?? null
+  );
+}
+
 export function getMaterialsTotal(draft: QuoteDraft): number {
-  if (!draft.selectedTier) return 0;
-  // Rebuild the packages from the draft (deterministic) and take the chosen
-  // tier's subtotal, so materials cost stays in sync if dimensions change.
-  const pkg = buildMaterialPackages({
-    jobType: draft.jobType,
-    area: getArea(draft),
-    unit: draft.unit,
-  }).find((p) => p.tier === draft.selectedTier);
-  return pkg?.subtotal ?? 0;
+  return getSelectedPackage(draft)?.subtotal ?? 0;
 }
 
 export function getLabourTotal(draft: QuoteDraft): number {
