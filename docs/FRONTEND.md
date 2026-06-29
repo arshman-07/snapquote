@@ -27,14 +27,14 @@
 | Screen | Purpose | Status |
 |---|---|---|
 | New Quote (Dimensions) | Form for dimensions + room/job type | ✅ Built (Phase 1) |
-| Photo capture | Take/upload an image of the area (placeholder) | 🟨 Stub (chrome + wiring) |
+| Photo capture | Take/upload an image of the area (placeholder) | ✅ Built (Phase 1, no real capture) |
 | Materials | Brief → 3 tiered packages (budget/standard/premium) | ✅ Built (Phase 1, mock data) |
 | Labour | Days on site × daily rate (USD) | ✅ Built (Phase 1) |
 | Quote summary | Rough total, broken down (materials + labour) | ✅ Built (Phase 1) |
 | Saved quotes | List of past quotes | ⬜ Later |
 
-> All five flow screens exist and walk end-to-end. Dimensions, Materials, Labour, and Summary are
-> built; Photo still renders a placeholder body on the shared chrome and is being filled in next.
+> All five flow screens are built and walk end-to-end (Dimensions, Photo, Materials, Labour,
+> Summary). Phase 1 placeholders are complete; data wiring + real capture come in later phases.
 
 ## Quote flow architecture
 
@@ -57,6 +57,12 @@
 
 ## Decisions log
 
+- **2026-06-29:** Photo step built (optional). No real camera/library access in Phase 1 — a tappable
+  dashed dropzone plus "Take photo" / "Choose from library" buttons all just set the draft's
+  `photoAdded` flag; once added, a placeholder thumbnail tile (✓ "Photo added") shows with a Remove
+  action. Layout telegraphs the eventual capture UX so Phase 3 can swap in `expo-image-picker`
+  without changing it. Continue stays enabled throughout since the photo is skippable. This
+  completes all five Phase-1 flow screens.
 - **2026-06-29:** Summary step built — a receipt-style breakdown: job recap (room + floor area),
   the chosen material package's itemized line items (read-only, no buy links) + materials subtotal,
   a `days × rate/day` labour line + labour subtotal, then a headline accent grand total and a
@@ -91,5 +97,5 @@
 
 ## Status
 
-- [~] Phase 1: placeholder screens built with sample data — Dimensions + Materials + Labour + Summary done; Photo stubbed on shared chrome, content next
+- [x] Phase 1: placeholder screens built with sample data — all five flow screens (Dimensions, Photo, Materials, Labour, Summary) built and walking end-to-end
 - [x] Phase 1: navigation restructured to a root Stack so the quote flow can present over the tabs
