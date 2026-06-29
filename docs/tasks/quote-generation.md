@@ -13,8 +13,14 @@ way the company can show a customer.
 
 ## Phase 1 (placeholders)
 
-- [ ] Quote summary screen with a sample breakdown (materials + labour + total).
-- [ ] Static numbers pulled from the placeholder data of earlier steps.
+- [x] Quote summary screen with a sample breakdown (materials + labour + total).
+- [x] Static numbers pulled from the placeholder data of earlier steps.
+
+> Built 2026-06-29 (`src/app/(quote)/summary.tsx`). Receipt-style: job recap (room + floor area),
+> the chosen material package's itemized lines + materials subtotal, a `days × rate/day` labour line
+> + labour subtotal, and a headline accent grand total, plus a freshness/disclaimer line. Empty
+> sections degrade gracefully. Totals come from the shared `QuoteDraft` helpers (`getSelectedPackage`,
+> `getMaterialsTotal`, `getLabourTotal`, `getQuoteTotal`). Done clears the draft + returns home.
 
 ## Later
 
@@ -30,4 +36,5 @@ way the company can show a customer.
 
 ## Status
 
-- [ ] Not started
+- [x] Phase 1: placeholder summary screen built (2026-06-29)
+- [ ] Later: persistence, editable line items, share/export, saved quotes list

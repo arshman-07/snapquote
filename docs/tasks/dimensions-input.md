@@ -39,5 +39,5 @@ labour, and summary steps can size up the quote from them. Built on the shared f
 ## Status
 
 - [x] Phase 1 Dimensions screen built (static placeholders), wired into the multi-step quote flow.
-- [~] Steps 2–5 (Photo / Materials / Labour / Summary) stubbed on shared chrome; content in progress.
+- [x] Steps 2–5 (Photo / Materials / Labour / Summary) now built on the shared chrome (2026-06-29).
 - Open questions below still need product answers.

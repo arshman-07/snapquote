@@ -13,8 +13,14 @@ refine or add to the estimate.
 
 ## Phase 1 (placeholders)
 
-- [ ] Photo capture screen with a placeholder image area + "take/upload" buttons (no-op).
-- [ ] No real camera/AI yet.
+- [x] Photo capture screen with a placeholder image area + "take/upload" buttons (no-op).
+- [x] No real camera/AI yet.
+
+> Built 2026-06-29 (`src/app/(quote)/photo.tsx`). Optional step: a tappable dashed dropzone plus
+> "Take photo" / "Choose from library" buttons that all set the draft's `photoAdded` flag (no real
+> capture yet). Once added, a placeholder thumbnail tile (✓ "Photo added") shows with a Remove
+> action. Continue stays enabled since the photo is skippable. Layout telegraphs the eventual
+> capture UX so Phase 3 can swap in `expo-image-picker` without changing it.
 
 ## Later
 
@@ -29,4 +35,5 @@ refine or add to the estimate.
 
 ## Status
 
-- [ ] Not started
+- [x] Phase 1: placeholder capture screen built (2026-06-29)
+- [ ] Later: real capture (`expo-image-picker`/`expo-camera`), upload to Directus, feed into AI

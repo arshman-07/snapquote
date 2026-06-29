@@ -54,6 +54,6 @@ prices, factors in the company's own labour rate, and outputs a rough total quot
 
 - [x] Project vision & stack decided
 - [x] Documentation structure created
-- [~] Phase 1: frontend placeholder shell — Dimensions, Materials, Labour built; Photo + Summary in progress
+- [x] Phase 1: frontend placeholder shell — all five flow screens built (Dimensions, Photo, Materials, Labour, Summary), walking end-to-end (2026-06-29)
 - [ ] Phase 2: Directus integration
 - [ ] Phase 3: AI estimation
