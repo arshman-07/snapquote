@@ -43,6 +43,7 @@ prices, factors in the company's own labour rate, and outputs a rough total quot
 - [PROJECT.md](./PROJECT.md) — this file; vision, flow, stack, phasing.
 - [FRONTEND.md](./FRONTEND.md) — living status of the frontend.
 - [BACKEND.md](./BACKEND.md) — living status of the backend (Directus + Postgres).
+- `docs/sessions/` — one file per session with a summary of what was done and decided.
 - `docs/tasks/` — one file per major task with spec + progress:
   - [tasks/dimensions-input.md](./tasks/dimensions-input.md)
   - [tasks/ai-material-estimation.md](./tasks/ai-material-estimation.md)

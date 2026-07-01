@@ -67,9 +67,15 @@ The endpoint returns the shape the frontend already renders (mirrored in
 
 ## Self-hosting
 
-- [ ] Docker Compose for Directus + Postgres
-- [ ] Environment/secrets handling
+- [x] Directus + Postgres running on spare Linux laptop (devbox), managed via pm2
+- [x] Accessible over Tailscale (stable private IP, no public exposure)
+- [ ] Environment/secrets handling (`.env` in place, formal secrets rotation TBD)
 - [ ] Backup strategy for Postgres
+
+### Devbox stack
+
+The server also runs: Node, Git, pm2, MongoDB, Tailscale. Directus is the API layer;
+pm2 keeps it alive across reboots.
 
 ## Decisions log
 
@@ -80,9 +86,14 @@ The endpoint returns the shape the frontend already renders (mirrored in
   in floor area. **AI + web-search/affiliate APIs, not scraping.** Buy links are affiliate links.
 - **2026-06-27:** Estimates cached in Postgres (`material_estimates`), **~7-day TTL** + `pricedAt`
   freshness + manual refresh. Frontend already renders this contract via a Phase-1 mock.
+- **2026-06-29:** Phase 2 collections scoped to what the frontend actually wires up:
+  `quotes`, `quote_items`, `room_types`, `labour_rates`. Deferred to Phase 3: `materials`,
+  `material_estimates` (schema will be shaped by the AI estimation contract).
 
 ## Status
 
-- [ ] Phase 2: Directus + Postgres running locally
-- [ ] Phase 2: collections defined
+- [x] Phase 2: Directus + Postgres running on devbox (Tailscale)
+- [ ] Phase 2: collections defined (`quotes`, `quote_items`, `room_types`, `labour_rates`)
+- [ ] Phase 2: frontend wired to Directus (`@directus/sdk`, TanStack Query, RHF + zod)
 - [ ] Phase 3: AI material estimation endpoint
+- [ ] Phase 3: `materials` + `material_estimates` collections
