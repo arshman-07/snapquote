@@ -1,117 +1,143 @@
 import { useRouter } from 'expo-router';
-import * as Device from 'expo-device';
-import { Platform, Pressable, StyleSheet } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { formatMoney } from '@/constants/quote';
+import { RECENT_QUOTES, type RecentQuote } from '@/constants/recent-quotes-mock';
+import { Accent, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
-
+// Home tab — the app's landing screen. A short brand header, the primary entry
+// point into the quote flow, and a list of recently created quotes. Phase 1:
+// the recent list is static mock data (see recent-quotes-mock.ts); Phase 2 will
+// swap it for a Directus query without changing this UI.
 export default function HomeScreen() {
   const router = useRouter();
+
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}>
+          {/* Brand header — replaces the Expo starter hero. */}
+          <View style={styles.header}>
+            <ThemedText type="title">SnapQuote</ThemedText>
+            <ThemedText type="default" themeColor="textSecondary">
+              Quick quotes for construction jobs.
+            </ThemedText>
+          </View>
 
-          {/* Entry point into the quote flow — opens the dimensions-input screen. */}
+          {/* Primary CTA — opens the dimensions-input step of the quote flow. */}
           <Pressable
             onPress={() => router.push('/new-quote')}
             style={({ pressed }) => pressed && styles.pressed}>
-            <ThemedView type="backgroundSelected" style={styles.ctaButton}>
-              <ThemedText type="smallBold">Start a new quote</ThemedText>
-            </ThemedView>
+            <View style={styles.ctaButton}>
+              <ThemedText type="smallBold" style={styles.ctaLabel}>
+                Start a new quote
+              </ThemedText>
+            </View>
           </Pressable>
-        </ThemedView>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
+          {/* Recent quotes — static Phase-1 placeholders. */}
+          <View style={styles.section}>
+            <ThemedText type="smallBold">Recent quotes</ThemedText>
+            {RECENT_QUOTES.length > 0 ? (
+              <ThemedView type="backgroundElement" style={styles.list}>
+                {RECENT_QUOTES.map((quote, index) => (
+                  <RecentQuoteRow key={quote.id} quote={quote} first={index === 0} />
+                ))}
+              </ThemedView>
+            ) : (
+              <ThemedText type="small" themeColor="textSecondary">
+                No quotes yet — start one above.
+              </ThemedText>
+            )}
+          </View>
+        </ScrollView>
       </SafeAreaView>
     </ThemedView>
   );
 }
 
+// One recent-quote row: job type + area/date on the left, total on the right.
+// A hairline top border separates rows (skipped on the first).
+function RecentQuoteRow({ quote, first }: { quote: RecentQuote; first: boolean }) {
+  const theme = useTheme();
+  return (
+    <View
+      style={[
+        styles.row,
+        !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.backgroundSelected },
+      ]}>
+      <View style={styles.rowMain}>
+        <ThemedText type="small">{quote.jobType}</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          {quote.area.toLocaleString()} {quote.unit}² · {formatDate(quote.dateISO)}
+        </ThemedText>
+      </View>
+      <ThemedText type="smallBold" style={{ color: Accent }}>
+        {formatMoney(quote.total)}
+      </ThemedText>
+    </View>
+  );
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
     flexDirection: 'row',
+    justifyContent: 'center',
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
+    alignSelf: 'stretch',
     maxWidth: MaxContentWidth,
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
+  content: {
     paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.four,
+    paddingBottom: BottomTabInset + Spacing.four,
     gap: Spacing.four,
   },
-  title: {
-    textAlign: 'center',
+  header: {
+    gap: Spacing.one,
   },
   ctaButton: {
+    backgroundColor: Accent,
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.three,
     borderRadius: Spacing.five,
+    alignItems: 'center',
+  },
+  ctaLabel: {
+    color: '#ffffff',
   },
   pressed: {
     opacity: 0.7,
   },
-  code: {
-    textTransform: 'uppercase',
+  section: {
+    gap: Spacing.two,
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
+  list: {
     borderRadius: Spacing.four,
+    paddingHorizontal: Spacing.four,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Spacing.three,
+    paddingVertical: Spacing.three,
+  },
+  rowMain: {
+    flex: 1,
+    gap: Spacing.half,
   },
 });

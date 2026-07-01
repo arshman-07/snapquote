@@ -31,7 +31,8 @@
 | Materials | Brief → 3 tiered packages (budget/standard/premium) | ✅ Built (Phase 1, mock data) |
 | Labour | Days on site × daily rate (USD) | ✅ Built (Phase 1) |
 | Quote summary | Rough total, broken down (materials + labour) | ✅ Built (Phase 1) |
-| Saved quotes | List of past quotes | ⬜ Later |
+| Home | Landing: brand header, "Start a new quote" CTA, recent quotes list | ✅ Built (Phase 1, mock recents) |
+| Saved quotes | List of past quotes | ⬜ Later (Home shows a recent-quotes preview) |
 
 > All five flow screens are built and walk end-to-end (Dimensions, Photo, Materials, Labour,
 > Summary). Phase 1 placeholders are complete; data wiring + real capture come in later phases.
@@ -57,6 +58,14 @@
 
 ## Decisions log
 
+- **2026-07-01:** Home tab rebuilt from the Expo starter into a real landing screen — a
+  "SnapQuote" brand header + tagline, a full-width accent "Start a new quote" CTA (keeps the
+  `/new-quote` entry point), and a "Recent quotes" list. The list is static Phase-1 mock data
+  (`src/constants/recent-quotes-mock.ts`, shaped to the eventual Directus response: id/jobType/
+  area/unit/total/dateISO) rendered as hairline-separated rows (job type + area/date left, accent
+  total right), reusing `formatMoney`. Includes an empty-state fallback (unused while seeded).
+  Dropped the starter scaffolding (animated icon, dev-tool `HintRow`s, `WebBadge`) — those
+  components stay (still used by Explore). Screen is a `ScrollView` so the list grows gracefully.
 - **2026-06-29:** Photo step built (optional). No real camera/library access in Phase 1 — a tappable
   dashed dropzone plus "Take photo" / "Choose from library" buttons all just set the draft's
   `photoAdded` flag; once added, a placeholder thumbnail tile (✓ "Photo added") shows with a Remove
