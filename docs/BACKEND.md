@@ -93,7 +93,7 @@ pm2 keeps it alive across reboots.
 ## Status
 
 - [x] Phase 2: Directus + Postgres running on devbox (Tailscale)
-- [ ] Phase 2: collections defined (`quotes`, `quote_items`, `room_types`, `labour_rates`)
-- [ ] Phase 2: frontend wired to Directus (`@directus/sdk`, TanStack Query, RHF + zod)
+- [x] Phase 2: collections defined + verified (`quotes`, `quote_items`, `room_types`, `labour_rates`); Public read on `room_types`
+- [ ] Phase 2: frontend wired to Directus — foundation done (`@directus/sdk` client, TanStack Query provider); steps not wired yet
 - [ ] Phase 3: AI material estimation endpoint
 - [ ] Phase 3: `materials` + `material_estimates` collections
