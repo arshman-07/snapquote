@@ -20,7 +20,12 @@ Let the company set/update their own labour rate and factor it into the quote to
 
 ## Later
 
-- [ ] Persist labour rates to Directus (`labour_rates`); remember the company's usual rate.
+- [x] Quick-pick rates fetched from Directus `labour_rates` (2026-07-02). `useLabourRates` hook
+      (`src/hooks/use-labour-rates.ts`), sorted cheapest-first; loading spinner; error/offline or an
+      empty collection falls back to the static `LABOUR_RATE_PRESETS` (offline note only on real
+      failure). Custom rate field unchanged. **Note:** collection is still unseeded — add rows
+      (300/450/600 USD) in the Directus admin to exercise the live path. Public read granted.
+- [ ] Remember the company's usual rate (write-back — needs auth).
 - [ ] Support multiple rate types / per-job-type rates.
 
 ## Open questions

@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, StyleSheet, Switch, View } from 'react-native';
 
 import { QuoteStepScreen } from '@/components/quote-step-screen';
 import { StepFooter } from '@/components/step-footer';
@@ -16,15 +17,21 @@ import {
   getSelectedPackage,
   useQuoteDraft,
 } from '@/context/quote-draft';
+import { useSaveQuote } from '@/hooks/use-save-quote';
 import { useTheme } from '@/hooks/use-theme';
+import { buildQuotePayload } from '@/lib/quote-payload';
 
 // Step 5 — Quote summary. A receipt-style breakdown of everything the user
 // entered: a job recap, the chosen material package's line items, the labour
 // line, and a headline grand total. Read-only — no buy links here, just the
-// numbers. Finishing clears the draft and returns home.
+// numbers. Done persists the quote to Directus (as a draft unless "Mark as
+// final" is on), then clears the local draft and returns home.
 export default function SummaryScreen() {
   const router = useRouter();
   const { draft, reset } = useQuoteDraft();
+  const saveQuote = useSaveQuote();
+  // Quotes save as 'draft' unless the user explicitly marks this one final.
+  const [markFinal, setMarkFinal] = useState(false);
 
   const area = getArea(draft);
   const pkg = getSelectedPackage(draft);
@@ -35,10 +42,25 @@ export default function SummaryScreen() {
   const days = parseInt(draft.labourDays || '0', 10) || 0;
   const rate = parseFloat(draft.labourDayRate);
 
-  function finish() {
+  // Clear the draft and unwind the whole modal flow back to the home tab.
+  function leave() {
     reset();
-    // Unwind the whole modal flow and land back on the home tab.
-    router.dismissTo('/index');
+    router.dismissTo('/');
+  }
+
+  // Done → persist to Directus, then leave. On failure the quote isn't lost
+  // silently: the user chooses between retrying and finishing unsaved.
+  function finish() {
+    saveQuote.mutate(buildQuotePayload(draft, markFinal ? 'final' : 'draft'), {
+      onSuccess: leave,
+      onError: () => {
+        Alert.alert("Couldn't save quote", 'Check your connection and try again.', [
+          { text: 'Retry', onPress: finish },
+          { text: 'Finish without saving', style: 'destructive', onPress: leave },
+          { text: 'Cancel', style: 'cancel' },
+        ]);
+      },
+    });
   }
 
   return (
@@ -47,7 +69,14 @@ export default function SummaryScreen() {
       overline={draft.jobType ?? 'New quote'}
       title="Your quote"
       description="A rough estimate based on what you entered."
-      footer={<StepFooter primaryLabel="Done" onPrimary={finish} onBack={() => router.back()} />}>
+      footer={
+        <StepFooter
+          primaryLabel={saveQuote.isPending ? 'Saving…' : 'Done'}
+          primaryDisabled={saveQuote.isPending}
+          onPrimary={finish}
+          onBack={() => router.back()}
+        />
+      }>
       {/* Job recap — room + floor area for context. */}
       <ThemedView type="backgroundElement" style={styles.recapCard}>
         <ThemedText type="small" themeColor="textSecondary">
@@ -99,6 +128,17 @@ export default function SummaryScreen() {
         <ThemedText type="title" style={{ color: Accent }}>
           {formatMoney(total)}
         </ThemedText>
+      </ThemedView>
+
+      {/* Save-as toggle — quotes stay drafts unless the user calls this one done. */}
+      <ThemedView type="backgroundElement" style={styles.finalRow}>
+        <View style={styles.finalLabel}>
+          <ThemedText type="smallBold">Mark as final</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {markFinal ? 'Saved as a final quote' : 'Saved as a draft'}
+          </ThemedText>
+        </View>
+        <Switch value={markFinal} onValueChange={setMarkFinal} trackColor={{ true: Accent }} />
       </ThemedView>
 
       <ThemedText type="small" themeColor="textSecondary" style={styles.disclaimer}>
@@ -183,6 +223,18 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
     borderRadius: Spacing.four,
     gap: Spacing.one,
+  },
+  finalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.three,
+    padding: Spacing.four,
+    borderRadius: Spacing.four,
+  },
+  finalLabel: {
+    gap: Spacing.half,
+    flex: 1,
   },
   disclaimer: {
     textAlign: 'center',

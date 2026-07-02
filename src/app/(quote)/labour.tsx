@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { QuoteStepScreen } from '@/components/quote-step-screen';
 import { StepFooter } from '@/components/step-footer';
@@ -8,6 +8,7 @@ import { ThemedView } from '@/components/themed-view';
 import { LABOUR_RATE_PRESETS, formatMoney } from '@/constants/quote';
 import { Accent, Spacing } from '@/constants/theme';
 import { getLabourTotal, useQuoteDraft } from '@/context/quote-draft';
+import { useLabourRates } from '@/hooks/use-labour-rates';
 import { useTheme } from '@/hooks/use-theme';
 
 // Step 4 — Labour. Priced as days on site × a daily rate (USD). Days use a
@@ -16,6 +17,14 @@ import { useTheme } from '@/hooks/use-theme';
 export default function LabourScreen() {
   const router = useRouter();
   const { draft, updateDraft } = useQuoteDraft();
+
+  // Quick-pick rates come from Directus. On error/offline — or an empty,
+  // unseeded collection — fall back to the static presets so the step always
+  // offers sensible chips. The custom rate field works regardless.
+  const ratesQuery = useLabourRates();
+  const liveRates = ratesQuery.data?.map((r) => r.daily_rate) ?? [];
+  const usingFallback = ratesQuery.isError || (ratesQuery.isSuccess && liveRates.length === 0);
+  const ratePresets: readonly number[] = usingFallback ? LABOUR_RATE_PRESETS : liveRates;
 
   const days = parseInt(draft.labourDays || '0', 10) || 0;
   const rate = parseFloat(draft.labourDayRate);
@@ -61,20 +70,38 @@ export default function LabourScreen() {
       {/* Daily rate — quick-pick presets plus a custom field. */}
       <ThemedView style={styles.section}>
         <ThemedText type="smallBold">Daily rate</ThemedText>
-        <ThemedView style={styles.chipRow}>
-          {LABOUR_RATE_PRESETS.map((preset) => {
-            const selected = String(preset) === draft.labourDayRate;
-            return (
-              <Pressable key={preset} onPress={() => updateDraft({ labourDayRate: String(preset) })}>
-                <ThemedView
-                  type={selected ? 'backgroundSelected' : 'backgroundElement'}
-                  style={styles.chip}>
-                  <ThemedText type="small">{formatMoney(preset)}/day</ThemedText>
-                </ThemedView>
-              </Pressable>
-            );
-          })}
-        </ThemedView>
+        {ratesQuery.isLoading ? (
+          <ThemedView style={styles.chipLoading}>
+            <ActivityIndicator />
+            <ThemedText type="small" themeColor="textSecondary">
+              Loading rates…
+            </ThemedText>
+          </ThemedView>
+        ) : (
+          <ThemedView style={styles.chipRow}>
+            {ratePresets.map((preset) => {
+              const selected = String(preset) === draft.labourDayRate;
+              return (
+                <Pressable
+                  key={preset}
+                  onPress={() => updateDraft({ labourDayRate: String(preset) })}>
+                  <ThemedView
+                    type={selected ? 'backgroundSelected' : 'backgroundElement'}
+                    style={styles.chip}>
+                    <ThemedText type="small">{formatMoney(preset)}/day</ThemedText>
+                  </ThemedView>
+                </Pressable>
+              );
+            })}
+          </ThemedView>
+        )}
+        {/* Only badge the fallback as "offline" when the fetch actually failed;
+            an empty-but-reachable collection just silently shows the defaults. */}
+        {ratesQuery.isError && (
+          <ThemedText type="small" themeColor="textSecondary">
+            Offline — showing default rates.
+          </ThemedText>
+        )}
         <RateField
           value={draft.labourDayRate}
           onChangeText={(labourDayRate) => updateDraft({ labourDayRate })}
@@ -177,6 +204,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.two,
+  },
+  chipLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingVertical: Spacing.two,
   },
   chip: {
     paddingHorizontal: Spacing.three,

@@ -5,8 +5,11 @@
 export const UNITS = ['ft', 'm'] as const;
 export type Unit = (typeof UNITS)[number];
 
-// Room / job types offered at the start of a quote. Final launch list is still
-// an open product question (see docs/tasks/dimensions-input.md).
+// Offline fallback for the room / job types offered at the start of a quote.
+// The Dimensions step fetches these from Directus (`useRoomTypes`); this static
+// list is only shown when that request fails so a quote can still be started.
+// Final launch list is still an open product question (see
+// docs/tasks/dimensions-input.md).
 export const JOB_TYPES = [
   'Bathroom',
   'Kitchen',
@@ -23,8 +26,10 @@ export const JOB_TYPES = [
 export const QUOTE_STEPS = ['Dimensions', 'Photo', 'Materials', 'Labour', 'Summary'] as const;
 export const QUOTE_STEP_COUNT = QUOTE_STEPS.length;
 
-// Quick-pick daily labour rates (USD). Illustrative US trade day rates; the
-// user can always type a custom figure on the Labour step.
+// Offline fallback for the quick-pick daily labour rates (USD). The Labour step
+// fetches live rates from Directus (`useLabourRates`); these are shown when the
+// request fails or the collection is empty. The user can always type a custom
+// figure regardless.
 export const LABOUR_RATE_PRESETS = [300, 450, 600] as const;
 
 // Currency helper so every screen formats money the same way. USD — the app

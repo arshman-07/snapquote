@@ -24,7 +24,16 @@ way the company can show a customer.
 
 ## Later
 
-- [ ] Persist quotes to Directus (`quotes` + `quote_items`).
+- [x] Persist quotes to Directus (2026-07-02). `buildQuotePayload` (`src/lib/quote-payload.ts`)
+      converts the draft + derived totals into the `quotes` row and `quote_items` lines (one per
+      material in the chosen package + one labour line). `useSaveQuote`
+      (`src/hooks/use-save-quote.ts`) creates the quote then its items, and invalidates `['quotes']`.
+      Summary's Done saves with a pending "Saving…" state; a **"Mark as final"** toggle decides
+      `status` (`draft` by default); on failure an alert offers Retry / Finish without saving /
+      Cancel — the quote is never lost silently. Also fixed the pre-existing `dismissTo('/index')`
+      typedRoutes error (`'/'`). **Note:** Public read on `quotes` currently excludes the `status`
+      field — grant it in the admin before the recent-quotes list needs to badge drafts. Public
+      create/read on both collections is temporary until auth (Section 7) locks it down.
 - [ ] Editable line items before finalizing.
 - [ ] Share/export (PDF, link) — TBD.
 - [ ] Saved quotes list.

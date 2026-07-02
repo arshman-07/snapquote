@@ -11,6 +11,11 @@ import {
 // kept as raw strings so the TextInputs stay controlled while the user types
 // (including partial / empty values). Everything starts empty.
 export type QuoteDraft = {
+  // The chosen room type: `jobTypeId` is the stable Directus room_types.id
+  // (saved to the quote / used for future room-keyed config), `jobType` is its
+  // display name that the rest of the wizard renders. Both set together when a
+  // chip is picked; both null until then.
+  jobTypeId: number | null;
   jobType: string | null;
   unit: Unit;
   length: string;
@@ -31,6 +36,7 @@ export type QuoteDraft = {
 };
 
 const INITIAL_DRAFT: QuoteDraft = {
+  jobTypeId: null,
   jobType: null,
   unit: 'ft',
   length: '',
