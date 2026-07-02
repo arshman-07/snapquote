@@ -44,6 +44,7 @@ prices, factors in the company's own labour rate, and outputs a rough total quot
 - [FRONTEND.md](./FRONTEND.md) — living status of the frontend.
 - [BACKEND.md](./BACKEND.md) — living status of the backend (Directus + Postgres).
 - [FUTURE.md](./FUTURE.md) — backlog of features to build once the groundwork is ready.
+- [OPEN-QUESTIONS.md](./OPEN-QUESTIONS.md) — decisions needed to finish Phase 2 (auth) and start Phase 3.
 - `docs/sessions/` — one file per session with a summary of what was done and decided.
 - `docs/tasks/` — one file per major task with spec + progress:
   - [tasks/dimensions-input.md](./tasks/dimensions-input.md)
