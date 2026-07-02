@@ -57,5 +57,5 @@ prices, factors in the company's own labour rate, and outputs a rough total quot
 - [x] Project vision & stack decided
 - [x] Documentation structure created
 - [x] Phase 1: frontend placeholder shell — all five flow screens built (Dimensions, Photo, Materials, Labour, Summary), walking end-to-end (2026-06-29)
-- [~] Phase 2: Directus integration — backend live (Directus 12 + Postgres via Docker Compose; 4 collections). Done: SDK + TanStack Query foundation; Dimensions wired to `room_types` + RHF/zod validation; Labour wired to `labour_rates`; quotes + line items persist on finish (2026-07-02). Remaining: recent-quotes read on Home; auth
+- [~] Phase 2: Directus integration — backend live (Directus 12 + Postgres via Docker Compose; 4 collections). Done: SDK + TanStack Query foundation; Dimensions wired to `room_types` + RHF/zod validation; Labour wired to `labour_rates`; quotes + line items persist on finish; Home lists real recent quotes (2026-07-02). Remaining: auth
 - [ ] Phase 3: AI estimation

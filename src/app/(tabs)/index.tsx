@@ -1,27 +1,41 @@
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { formatMoney } from '@/constants/quote';
-import { RECENT_QUOTES, type RecentQuote } from '@/constants/recent-quotes-mock';
 import { Accent, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useRecentQuotes, type RecentQuote } from '@/hooks/use-recent-quotes';
 import { useTheme } from '@/hooks/use-theme';
 
 // Home tab — the app's landing screen. A short brand header, the primary entry
-// point into the quote flow, and a list of recently created quotes. Phase 1:
-// the recent list is static mock data (see recent-quotes-mock.ts); Phase 2 will
-// swap it for a Directus query without changing this UI.
+// point into the quote flow, and the five most recent saved quotes from
+// Directus (auto-refreshed when a new quote is saved; pull down to refetch).
 export default function HomeScreen() {
   const router = useRouter();
+  const quotesQuery = useRecentQuotes();
+  const quotes = quotesQuery.data ?? [];
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <ScrollView
           contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={quotesQuery.isRefetching}
+              onRefresh={() => quotesQuery.refetch()}
+            />
+          }>
           {/* Brand header — replaces the Expo starter hero. */}
           <View style={styles.header}>
             <ThemedText type="title">SnapQuote</ThemedText>
@@ -41,12 +55,21 @@ export default function HomeScreen() {
             </View>
           </Pressable>
 
-          {/* Recent quotes — static Phase-1 placeholders. */}
+          {/* Recent quotes — live from Directus. No mock fallback here: fake
+              quote history with fake totals would mislead, so errors just say so. */}
           <View style={styles.section}>
             <ThemedText type="smallBold">Recent quotes</ThemedText>
-            {RECENT_QUOTES.length > 0 ? (
+            {quotesQuery.isLoading ? (
+              <View style={styles.listStatus}>
+                <ActivityIndicator />
+              </View>
+            ) : quotesQuery.isError ? (
+              <ThemedText type="small" themeColor="textSecondary">
+                Couldn&apos;t load recent quotes — pull down to retry.
+              </ThemedText>
+            ) : quotes.length > 0 ? (
               <ThemedView type="backgroundElement" style={styles.list}>
-                {RECENT_QUOTES.map((quote, index) => (
+                {quotes.map((quote, index) => (
                   <RecentQuoteRow key={quote.id} quote={quote} first={index === 0} />
                 ))}
               </ThemedView>
@@ -62,10 +85,14 @@ export default function HomeScreen() {
   );
 }
 
-// One recent-quote row: job type + area/date on the left, total on the right.
-// A hairline top border separates rows (skipped on the first).
+// One recent-quote row: job type + area/date on the left, total on the right,
+// with a "Draft" tag on anything not marked final. Rows can be sparse (null
+// dims/totals), so every fragment degrades gracefully. A hairline top border
+// separates rows (skipped on the first).
 function RecentQuoteRow({ quote, first }: { quote: RecentQuote; first: boolean }) {
   const theme = useTheme();
+  // Area is derived, and only shown when both dimensions were saved.
+  const area = quote.length !== null && quote.width !== null ? quote.length * quote.width : null;
   return (
     <View
       style={[
@@ -73,13 +100,23 @@ function RecentQuoteRow({ quote, first }: { quote: RecentQuote; first: boolean }
         !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.backgroundSelected },
       ]}>
       <View style={styles.rowMain}>
-        <ThemedText type="small">{quote.jobType}</ThemedText>
+        <View style={styles.rowTitle}>
+          <ThemedText type="small">{quote.job_type ?? 'Quote'}</ThemedText>
+          {quote.status !== 'final' && (
+            <ThemedView type="backgroundSelected" style={styles.draftTag}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Draft
+              </ThemedText>
+            </ThemedView>
+          )}
+        </View>
         <ThemedText type="small" themeColor="textSecondary">
-          {quote.area.toLocaleString()} {quote.unit}² · {formatDate(quote.dateISO)}
+          {area !== null ? `${area.toLocaleString()} ${quote.unit}² · ` : ''}
+          {formatDate(quote.date_created)}
         </ThemedText>
       </View>
       <ThemedText type="smallBold" style={{ color: Accent }}>
-        {formatMoney(quote.total)}
+        {formatMoney(quote.grand_total ?? 0)}
       </ThemedText>
     </View>
   );
@@ -139,5 +176,19 @@ const styles = StyleSheet.create({
   rowMain: {
     flex: 1,
     gap: Spacing.half,
+  },
+  rowTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  draftTag: {
+    paddingHorizontal: Spacing.one + Spacing.half,
+    paddingVertical: Spacing.half,
+    borderRadius: Spacing.two,
+  },
+  listStatus: {
+    paddingVertical: Spacing.three,
+    alignItems: 'flex-start',
   },
 });

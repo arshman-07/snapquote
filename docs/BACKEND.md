@@ -77,6 +77,31 @@ The endpoint returns the shape the frontend already renders (mirrored in
 The server also runs: Node, Git, pm2, MongoDB, Tailscale. Directus is the API layer;
 pm2 keeps it alive across reboots.
 
+## Schema as built (2026-07-02)
+
+- `room_types` — id, sort, name (string, required). Seeded: Bedroom, Bathroom, Kitchen,
+  Living Room, Flooring, Painting.
+- `labour_rates` — id, daily_rate (float, required), currency (string, default USD). Unseeded.
+- `quotes` — id, date_created, user_created, job_type (string), unit (string),
+  material_brief (textarea), material_zip (string), length/width/height (float),
+  selected_tier (dropdown: budget/standard/premium), materials_total/labour_total/grand_total
+  (float), status (dropdown: draft/final, default draft — added 2026-07-02 after the frontend
+  was already sending it; earlier rows backfilled to draft).
+- `quote_items` — id, kind (dropdown: material/labour), label (string), amount (float),
+  quote (M2O → quotes; reverse O2M `quote_items` on quotes).
+
+### Access policies
+
+- **Public** — designed as read on `room_types` only, but **temporarily widened for Phase 2
+  pre-auth wiring** (2026-07-02): read on `labour_rates`, create+read on `quotes` +
+  `quote_items`. Lock back down when auth lands.
+- **App User** — read on `room_types` + `labour_rates`; create/read/update on `quotes` +
+  `quote_items`.
+- ⚠️ **Row-level filters (`user_created = $CURRENT_USER`) are not available on the current
+  self-hosted Directus 12 plan.** User scoping must be applied in the frontend SDK query
+  filters when fetching quotes — meaning it is advisory, not server-enforced. Acceptable for a
+  single-company tool; revisit if the app ever serves multiple tenants.
+
 ## Decisions log
 
 - **2026-06-06:** Backend is Directus + Postgres, self-hosted.
