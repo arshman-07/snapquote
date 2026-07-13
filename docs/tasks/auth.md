@@ -85,7 +85,13 @@ which resolved OQ #1/#2 and reshaped this task:
       not network failure. Verified on web: cold start and protected deep link
       both land on /login; garbage token triggers one /auth/refresh then login.
       ⚠️ App is login-gated with a placeholder screen until the next step lands.)
-- [ ] Login + sign-up screens (`(auth)` route group has a placeholder login)
+- [x] Login screen (2026-07-13: real email/password form — RHF + zod
+      (`src/lib/auth-schema.ts`), inline validation, submit spinner, server
+      errors mapped: `INVALID_CREDENTIALS` → "Email or password is incorrect.",
+      network failure → connection message. Verified against live Directus
+      (401 path); the success path still needs a test user + a run on the phone.)
+- [ ] Sign-up screen with contractor/homeowner choice (needs Directus public
+      registration enabled + `user_type` field — see checklist item above)
 - [x] SDK client: `authentication()` mode with SecureStore-backed storage adapter
       (2026-07-13: `src/lib/auth-storage.ts` — refresh token in SecureStore
       (localStorage on web), access token memory-only; client in `directus.ts` is
