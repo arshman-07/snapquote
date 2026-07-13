@@ -27,6 +27,19 @@ needed and their prices, producing a rough material subtotal.
   See [BACKEND.md](../BACKEND.md).
 - Quantities are **grounded in floor area** (e.g. "≈140 sq ft of tile"), not generic.
 
+### Known Phase-1 gap to fix here (noted 2026-07-13)
+
+The Phase-1 mock is **not job-type-aware and ignores height entirely.**
+`getArea` (`src/context/quote-draft.tsx`) is always floor area (length × width);
+`buildMaterialPackages` receives `jobType` but never reads it, and prices paint
+off floor area ÷ 350. So a **painting** job doesn't factor in the walls — height
+is captured/validated/saved but never enters any calculation, and the total is
+identical to flooring. Phase 3 must make the estimate **job-type-aware**: wall
+jobs (painting) price off **wall area ≈ 2 × (length + width) × height** (+ ceiling
+where relevant), floor jobs off floor area. This also implies height becomes
+**required** for wall-based job types (optional today in `quote-schema.ts`).
+Deferred to Phase 3 by the maintainer rather than patched into the mock.
+
 ## Phase 1 (placeholders)
 
 - [x] Materials screen: brief + ZIP inputs, "Get options" with a simulated loading round-trip.
