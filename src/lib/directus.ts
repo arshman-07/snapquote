@@ -1,4 +1,6 @@
-import { createDirectus, rest } from '@directus/sdk';
+import { authentication, createDirectus, rest } from '@directus/sdk';
+
+import { authStorage } from '@/lib/auth-storage';
 
 // Typed shape of the four Phase-2 collections. This drives the SDK's return
 // types — `readItems('room_types')` etc. infer from here, so keep these field
@@ -61,7 +63,13 @@ if (!directusUrl) {
   throw new Error('EXPO_PUBLIC_DIRECTUS_URL is not set — check the .env file.');
 }
 
-// Unauthenticated REST client for now: reads rely on the Public policy's read
-// access to room_types. We'll add `.with(authentication())` + login as its own
-// section when the app grows real users.
-export const directus = createDirectus<Schema>(directusUrl).with(rest());
+// Authenticated REST client. `json` mode because React Native has no cookies;
+// the SecureStore-backed adapter keeps the refresh token on-device and the
+// access token in memory (see auth-storage.ts). autoRefresh renews the access
+// token shortly before it expires during a session; restoring the session on a
+// cold launch is the auth context's job (it calls `directus.refresh()`).
+// Until login exists, requests simply carry no token and fall through to the
+// Public policy — same behaviour as the old anonymous client.
+export const directus = createDirectus<Schema>(directusUrl)
+  .with(authentication('json', { storage: authStorage, autoRefresh: true }))
+  .with(rest());
