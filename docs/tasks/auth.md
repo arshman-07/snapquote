@@ -89,7 +89,8 @@ which resolved OQ #1/#2 and reshaped this task:
       (`src/lib/auth-schema.ts`), inline validation, submit spinner, server
       errors mapped: `INVALID_CREDENTIALS` → "Email or password is incorrect.",
       network failure → connection message. Verified against live Directus
-      (401 path); the success path still needs a test user + a run on the phone.)
+      (401 path); success path confirmed by the maintainer signing in from the
+      app on-device, 2026-07-13.)
 - [ ] Sign-up screen with contractor/homeowner choice (needs Directus public
       registration enabled + `user_type` field — see checklist item above)
 - [x] SDK client: `authentication()` mode with SecureStore-backed storage adapter
