@@ -9,6 +9,59 @@ Status legend: ✅ in place · 🔜 planned/agreed · ❓ needs discussion
 
 ---
 
+## 0. 🚨 CRITICAL — live account-takeover hole (found 2026-07-13)
+
+**Status: unpatched and exploitable right now.** Discovered by API probing while
+scoping the sign-up screen. Two settings combine into a full compromise:
+
+1. **Public registration is enabled** — `POST /users/register` (204) lets anyone
+   on the network create an App User account, no approval.
+2. **The App User policy has Read + Update on `directus_users` with "All Access"
+   (no row filter)** — because "Use Custom" (row-level filters) is paywalled on
+   this Directus plan, the field was left as All Access.
+
+Proven with two throwaway users (`probe-a@example.com`, `probe-b@example.com`,
+password `ProbeTest123!` — **delete these**):
+
+- A freshly-registered user **read every user record**, including the admin's
+  email (`rajaarshman12@gmail.com`) and, critically, the admin's **role UUID**
+  (`c8b669ae-40b8-44e4-b79e-a18d270ca12c`).
+- That user **modified another user's record** (set `probe-b.first_name`, then
+  reverted it) and **modified the admin's record** (changed the admin
+  `first_name` to `PROBE_TEST` — ⚠️ original value not captured; **admin should
+  reset their own first name in the UI**).
+- Self role-escalation to `admin` returned 500, **not 403** — i.e. the write was
+  *attempted*, not permission-denied; it only failed because the literal string
+  `"admin"` isn't a valid role UUID. Since the user can read the real admin role
+  UUID (above) and Update on `role` isn't blocked, **full privilege escalation to
+  admin is near-certain.** Not executed — doing so would leave a live admin
+  backdoor with a known password. `directus_roles` itself is 403 to App User, but
+  that doesn't help: the UUID leaks through the readable user record.
+
+**This cannot be fixed in the frontend.** Frontend SDK filters are advisory; an
+attacker uses `curl`, not our app. Required server-side remediation, in order:
+
+- **Immediately:** on the App User policy, remove Update on `directus_users`
+  (or at minimum strip every field except `first_name`/`last_name`/`user_type`
+  from Update — field-level permissions appear to be available even though row
+  filters aren't; **verify `role`/`status`/`password`/`token`/`provider` are NOT
+  updatable**). Reduce Read to the minimum fields, ideally disable it.
+- **Delete the two probe users** and any unknown registrations.
+- **Reconsider whether public registration should be on at all** until the above
+  is locked down (it is the entry point that makes this reachable).
+
+**Design consequence for sign-up (blocks `docs/tasks/auth.md` §sign-up):** the
+planned "register → PATCH my own `directus_users.user_type`" flow depends on the
+exact Update permission that is dangerous here, and on this plan we can't scope
+that Update to "own record only." So storing `user_type` on the user record via
+the client is not viable as-is. Options to decide (see auth.md): a server-side
+Directus Flow/hook that sets `user_type` (no client write permission needed); a
+separate collection with create-own semantics (same row-filter limitation —
+probably no better); or drop the field and carry contractor/homeowner per-quote
+or in app state. **Needs a decision before the sign-up screen is built.**
+
+---
+
 ## 1. Current exposure (honest snapshot)
 
 The starting point, so we know what we're fixing:
