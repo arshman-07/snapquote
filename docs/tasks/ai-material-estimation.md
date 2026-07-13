@@ -13,6 +13,11 @@ needed and their prices, producing a rough material subtotal.
   explanation, quantity, price, retailer + buy link. Each package has a subtotal + `pricedAt`.
 - Runs **server-side** via Directus (endpoint/flow) or a companion service — never from
   the frontend.
+- **Added 2026-07-13:** the estimate must also cover **typical contractor labour cost**
+  for homeowner users (audience widened to everyday homeowners — see PROJECT.md).
+  Contractors keep entering their own days × rate; homeowners get the AI's labour
+  figure instead. Same call or separate is open (OPEN-QUESTIONS Phase 3 §3b) and
+  feeds the response contract.
 
 ## Approach (decided 2026-06-27)
 
@@ -30,6 +35,69 @@ needed and their prices, producing a rough material subtotal.
 - [x] Mock (`src/constants/materials-mock.ts`) is shaped to the eventual server response, so the
       screen won't change when wired to Directus.
 
+## Implementation options (surveyed 2026-07-03)
+
+Organized by the three decisions Phase 3 hangs on (`docs/OPEN-QUESTIONS.md` Phase 3
+§1–3). Model pricing below is current as of the survey date.
+
+### Decision 1 — Where the AI endpoint lives
+
+- **A. Directus endpoint extension ⭐ recommended.** Custom Node endpoint inside
+  Directus (e.g. `POST /ai/estimate`). Shares Directus auth (the endpoint checks the
+  caller's token for free once Phase 2 auth lands) and runs in the existing container —
+  no new service. Constraint: written in Directus's extension framework, fine for one
+  endpoint.
+- **B. Directus Flow + webhook — rejected.** Low-code, but a 10–30s AI call with real
+  logic (cache lookup, tier assembly, validation) is awkward in Flows.
+- **C. Companion service (Node/Hono) in the same docker-compose — later, if ever.**
+  Maximum freedom, but must validate Directus tokens itself and adds a second service
+  to run/monitor. Where we'd land if the AI layer grows into its own product.
+
+### Decision 2 — Model + price grounding
+
+Shape of the call: **one Claude API request per estimate** using the server-side
+**web search tool** (Claude searches current material prices itself — no scraping) and
+**structured outputs** (JSON schema matching the `materials-mock.ts` contract, so the
+frontend swap is trivial). One call returns **all three tiers** — search results and
+room context are shared across tiers, cheaper and more consistent than 3 calls.
+
+Model options (per-million-token pricing at survey date):
+
+| Model | Pricing (in/out) | Fit |
+|---|---|---|
+| **Claude Opus 4.8** ⭐ | $5 / $25 | Default recommendation — strongest at multi-step search-and-synthesize. Rough cost ~**$0.10–0.15 per estimate** (≈5K in / 4K out, all 3 tiers) + small per-search fee. |
+| Claude Sonnet 5 | $3 / $15 ($2/$10 intro to Aug 2026) | Near-Opus on this task at ~⅓ cost — option if volume gets high (user's call). |
+| Haiku 4.5 | $1 / $5 | Skip — price research + quantity math wants the reasoning quality. |
+
+Grounding options (orthogonal to model):
+
+- **AI + web search only ⭐ start here.** Fresh enough for a rough quote; zero external
+  approvals.
+- **Retailer/affiliate APIs** (Home Depot/Lowe's via Impact, Amazon PA-API) — exact
+  SKUs, real prices, affiliate revenue, but approval takes weeks. **Apply now** if
+  wanted at launch; layer on top of web search later. (Refines the 2026-06-27
+  "retailer API prices them" decision into a sequencing: web-search-grounded first,
+  retailer links as the upgrade.)
+- **AI-estimated only, no search** — cheapest/fastest (~cents, ~5s) but prices drift.
+  Use as the fallback when search fails, not the primary.
+
+### Decision 3 — Cost control
+
+- **Postgres result cache** keyed `{job type, ZIP, tier}`, ~7-day TTL (already
+  decided) is the dominant lever: first quote for a job-type+ZIP pays ~$0.10–0.30,
+  every other quote that week pays nothing. At launch scale the AI bill is likely
+  dollars/month.
+- Per-user rate limiting (OQ #11) is protection against a stolen token, not normal
+  usage.
+- Anthropic prompt caching adds marginal savings if calls cluster; the result cache
+  does the heavy lifting.
+
+### Recommended stack
+
+Directus endpoint extension + Claude Opus 4.8 with web search + JSON-schema output
+matching the mock contract + Postgres result cache + mock packages as the clearly
+labelled fallback on AI failure. Retailer/affiliate APIs deferred (apply early).
+
 ## Later (Phase 3)
 
 - [ ] Choose AI model/provider; decide integration shape (endpoint vs Flow vs microservice).
@@ -44,3 +112,4 @@ needed and their prices, producing a rough material subtotal.
 ## Status
 
 - [x] Phase 1 UI built on a mock matching the server contract. Phase 3 backend not started.
+- [ ] Implementation options surveyed 2026-07-03 (see above) — awaiting approach approval.

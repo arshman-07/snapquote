@@ -10,13 +10,15 @@ decisions into the relevant task docs.
 ## Phase 2 — Section 7: auth
 
 1. **Account model — one shared company login, or a user per employee?**
-   The app is per-company today. One shared "App User" account is simplest and fits
-   the current Directus setup; per-employee users would let quotes show who created
-   them (`user_created` is already stored) but means user management UI/process.
+   ✅ **Answered 2026-07-13: per-user accounts.** The app now targets everyday
+   homeowners as well as contractors (see PROJECT.md), so a shared company login
+   is off the table. A **contractor / homeowner** choice at sign-up is stored on
+   the profile and tailors the flow (labour step, quote wording).
 
-2. **Who creates accounts?** Sign-up inside the app, or accounts provisioned by hand
-   in the Directus admin? (Admin-provisioned is far simpler and fine for a
-   single-company launch; in-app sign-up is its own project.)
+2. **Who creates accounts?**
+   ✅ **Answered 2026-07-13: in-app sign-up for everyone** (contractors and
+   homeowners) via Directus public user registration into the App User role.
+   No admin provisioning.
 
 3. **Session lifetime & storage.** Directus issues access + refresh tokens. Proposal:
    store the refresh token in `expo-secure-store` and auto-refresh on launch, so the
@@ -30,10 +32,13 @@ decisions into the relevant task docs.
    keep `room_types` read for pre-login flows if we allow any). Everything moves to
    the App User role. Confirm nothing should stay public.
 
-6. **User scoping of quotes.** Row-level `$CURRENT_USER` filters aren't available on
-   this plan, so scoping lives in the frontend SDK query filter. With one shared
-   company account this is moot (all quotes are "ours"); with per-employee users,
-   decide whether everyone sees all company quotes (probably yes) or only their own.
+6. **User scoping of quotes.** ⚠️ **Escalated 2026-07-13:** with public sign-up,
+   users are strangers — each account must only ever see its own quotes. Frontend
+   SDK filters (advisory) are **not sufficient**; server-side enforcement is now a
+   hard requirement. Re-verify on the live Directus 12 whether `$CURRENT_USER`
+   row-level filters are truly unavailable (re-test before building auth); if they
+   are, we need a compensating server-side control (SECURITY.md §2.2). This blocks
+   the auth lockdown.
 
 7. **Offline behaviour once authed.** Today's offline fallbacks (static chips/rates,
    finish-without-saving) — keep as-is behind the login gate? (Recommended: yes,
@@ -68,6 +73,10 @@ decisions into the relevant task docs.
 
 ### Scope
 
+3b. **Labour estimation for homeowners** (added 2026-07-13): the AI must also return
+   a typical contractor labour cost (days and/or total) per job so homeowner users
+   get a full project cost. Same call as materials, or separate? Feeds the response
+   contract (#7). Numbered 3b to keep existing #4–11 references stable.
 4. **Photo estimation MVP scope.** The Photo step is a placeholder. For launch: does
    the photo actually influence the estimate (vision model call), or is it attached
    to the quote for reference only? (Reference-only is a much smaller Phase 3.)
@@ -97,7 +106,11 @@ decisions into the relevant task docs.
 
 ## Already decided (don't reopen)
 
-- Labour = days × daily rate (USD). US launch, USD, ft-first units.
+- **Audience = contractors + everyday homeowners** (2026-07-13). Contractor/homeowner
+  choice at sign-up tailors the flow; in-app sign-up for all; per-user accounts.
+- Labour: contractors enter days × daily rate (USD); homeowners get an
+  **app-estimated typical labour cost** (Phase 3 AI, alongside materials).
+- US launch, USD, ft-first units.
 - Materials = 3 tiered packages (budget/standard/premium), itemized, area-grounded.
 - No scraping — AI + retailer/affiliate APIs.
 - Estimates cached in Postgres, ~7d TTL, `pricedAt` freshness stamp.
