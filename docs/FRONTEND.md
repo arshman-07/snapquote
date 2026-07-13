@@ -56,6 +56,10 @@
   (Auth: the root Stack now gates `(tabs)`/`(quote)` behind a session — see the auth task doc.)
 - The starter **Explore** tab was replaced by a real **Quotes** tab (2026-07-13). Native tab icon
   still reuses the old `explore.png` compass as a placeholder — a list/document icon is TODO.
+- Web tab bar rebranded (2026-07-13): "Expo Starter" → **"SnapQuote"** (accent blue), and the
+  Expo "Docs" external link removed. Remaining starter branding TODO: `app.json` `name`/`slug` are
+  still `"mobile"` (affects the browser tab title + native app label — cross-platform, left for a
+  dedicated branding pass), plus the app icon / splash / favicon assets.
 
 ## Decisions log
 
