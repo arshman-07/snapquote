@@ -13,6 +13,7 @@ import { QuoteRow } from '@/components/quote-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useAuth } from '@/context/auth';
 import { useRecentQuotes } from '@/hooks/use-recent-quotes';
 
 // Home tab — the app's landing screen. A short brand header, the primary entry
@@ -20,6 +21,7 @@ import { useRecentQuotes } from '@/hooks/use-recent-quotes';
 // Directus (auto-refreshed when a new quote is saved; pull down to refetch).
 export default function HomeScreen() {
   const router = useRouter();
+  const { signOut } = useAuth();
   const quotesQuery = useRecentQuotes();
   const quotes = quotesQuery.data ?? [];
 
@@ -35,12 +37,25 @@ export default function HomeScreen() {
               onRefresh={() => quotesQuery.refetch()}
             />
           }>
-          {/* Brand header — replaces the Expo starter hero. */}
-          <View style={styles.header}>
-            <ThemedText type="title">SnapQuote</ThemedText>
-            <ThemedText type="default" themeColor="textSecondary">
-              Quick quotes for construction jobs.
-            </ThemedText>
+          {/* Brand header — replaces the Expo starter hero. Sign out sits
+              top-right; it clears the session and the gate returns to login. */}
+          <View style={styles.headerRow}>
+            <View style={styles.header}>
+              <ThemedText type="title">SnapQuote</ThemedText>
+              <ThemedText type="default" themeColor="textSecondary">
+                Quick quotes for construction jobs.
+              </ThemedText>
+            </View>
+            <Pressable
+              onPress={() => signOut()}
+              hitSlop={Spacing.two}
+              style={({ pressed }) => pressed && styles.pressed}>
+              <ThemedView type="backgroundElement" style={styles.signOutButton}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Sign out
+                </ThemedText>
+              </ThemedView>
+            </Pressable>
           </View>
 
           {/* Primary CTA — opens the dimensions-input step of the quote flow. */}
@@ -101,8 +116,20 @@ const styles = StyleSheet.create({
     paddingBottom: BottomTabInset + Spacing.four,
     gap: Spacing.four,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: Spacing.three,
+  },
   header: {
+    flex: 1,
     gap: Spacing.one,
+  },
+  signOutButton: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: Spacing.five,
   },
   ctaButton: {
     backgroundColor: Accent,

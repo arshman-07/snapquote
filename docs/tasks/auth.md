@@ -93,6 +93,13 @@ which resolved OQ #1/#2 and reshaped this task:
       app on-device, 2026-07-13.)
 - [ ] Sign-up screen with contractor/homeowner choice (needs Directus public
       registration enabled + `user_type` field — see checklist item above)
+- [x] Logout (2026-07-13: "Sign out" button in the Home header → auth context
+      `signOut` → `directus.logout()` + clears SecureStore + query cache → gate
+      returns to /login. Verified end-to-end on web: after sign out lands on
+      /login and the stored refresh token is null. ⚠️ Web-only: the fixed top
+      tab bar overlaps the Home header, so the button sits behind it on web —
+      fine on native (bottom tab bar + top safe-area inset). Revisit if web
+      becomes a real target, or move logout to a future Account screen.)
 - [x] SDK client: `authentication()` mode with SecureStore-backed storage adapter
       (2026-07-13: `src/lib/auth-storage.ts` — refresh token in SecureStore
       (localStorage on web), access token memory-only; client in `directus.ts` is
@@ -112,8 +119,8 @@ which resolved OQ #1/#2 and reshaped this task:
 
 ## Open questions
 
-- Logout in v1? (Clears SecureStore + query cache — SECURITY.md §2.3.) With
-  public per-user accounts, almost certainly yes.
+- ~~Logout in v1?~~ → Yes, done (2026-07-13): "Sign out" in the Home header.
+  May move to a dedicated Account screen later.
 - Email verification on sign-up — Directus registration supports it, but it
   needs a mail transport configured on the server. Launch without it?
 
