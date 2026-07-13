@@ -51,12 +51,22 @@
 
 ## Navigation
 
-- Tabs (**Home** + **Explore**) now live under the `(tabs)` group; a root `Stack` hosts both the
-  tabs and the `(quote)` flow so the wizard can present over them. URLs unchanged (`/`, `/explore`).
-- Still TBD: repurposing the tabs into quote-focused nav (e.g. **Quotes** + **New Quote**) — left
-  as-is for now.
+- Tabs (**Home** + **Quotes**) live under the `(tabs)` group; a root `Stack` hosts both the
+  tabs and the `(quote)` flow so the wizard can present over them. URLs: `/` and `/quotes`.
+  (Auth: the root Stack now gates `(tabs)`/`(quote)` behind a session — see the auth task doc.)
+- The starter **Explore** tab was replaced by a real **Quotes** tab (2026-07-13). Native tab icon
+  still reuses the old `explore.png` compass as a placeholder — a list/document icon is TODO.
 
 ## Decisions log
+
+- **2026-07-13:** Replaced the leftover Expo-starter **Explore** tab with a real **Quotes** tab
+  (`src/app/(tabs)/quotes.tsx`) — the full saved-quote history, newest first (Home still shows only
+  the 5 newest). The quote row (job type + area/date + total + Draft tag) was extracted from Home
+  into a shared `src/components/quote-row.tsx` (`QuoteRow` + `formatDate`), now used by both
+  screens. New `useAllQuotes` hook keyed `['quotes', 'all']` (a child of `['quotes']`, so
+  `useSaveQuote`'s invalidation refreshes it too), limit 100. Deleted `explore.tsx`; renamed the
+  tab (native + web). Not touched: the web tab bar's "Expo Starter" brand text + "Docs" link
+  (branding pass deferred). Verified on web behind the auth gate against live data.
 
 - **2026-07-01:** Home tab rebuilt from the Expo starter into a real landing screen — a
   "SnapQuote" brand header + tagline, a full-width accent "Start a new quote" CTA (keeps the

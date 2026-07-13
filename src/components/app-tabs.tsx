@@ -21,8 +21,10 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="explore">
-        <NativeTabs.Trigger.Label>Explore</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="quotes">
+        <NativeTabs.Trigger.Label>Quotes</NativeTabs.Trigger.Label>
+        {/* Placeholder icon — reuses the starter "explore" (compass) asset until
+            a proper list/document tab icon is added. */}
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/tabIcons/explore.png')}
           renderingMode="template"
