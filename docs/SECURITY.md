@@ -39,7 +39,20 @@ password `ProbeTest123!` — **delete these**):
   that doesn't help: the UUID leaks through the readable user record.
 
 **This cannot be fixed in the frontend.** Frontend SDK filters are advisory; an
-attacker uses `curl`, not our app. Required server-side remediation, in order:
+attacker uses `curl`, not our app.
+
+**The proper fix may be unlocked for free (verified 2026-07-13):** the reason
+row-level filters are unavailable is that we're on Directus's free **Core** tier,
+which gates custom/`$CURRENT_USER` permission filters (and SSO) behind paid
+**Team**/Enterprise. Directus's **Open Innovation Grant** (orgs under $5M
+revenue, <50 employees) grants fully permissive access at no software cost — if
+eligible, that turns the items below from "impossible on our plan" into "just
+configure the filter." Pursue the grant / tier decision first; it changes the
+whole remediation from workaround to real row-level security. See
+`docs/questions-for-senior-dev.md`.
+
+Required server-side remediation regardless (do the lockdown now; the grant
+enables the clean version):
 
 - **Immediately:** on the App User policy, remove Update on `directus_users`
   (or at minimum strip every field except `first_name`/`last_name`/`user_type`
