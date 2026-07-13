@@ -77,7 +77,15 @@ which resolved OQ #1/#2 and reshaped this task:
       `user_created = $CURRENT_USER`, probe with two accounts)
 - [ ] Enable Directus public registration into the App User role; add a
       `user_type` (contractor/homeowner) field on users
-- [ ] Login + sign-up screens (`(auth)` route group) + auth context/gate
+- [x] Auth context + gate (2026-07-13: `src/context/auth.tsx` —
+      restoring/signedIn/signedOut, restore-on-launch via `directus.refresh()`
+      (skipped when no stored token), signIn/signOut clear the query cache;
+      root layout gates `(tabs)`/`(quote)` vs `(auth)` with `Stack.Protected`.
+      Failed launch-refresh clears the stored token only on server rejection,
+      not network failure. Verified on web: cold start and protected deep link
+      both land on /login; garbage token triggers one /auth/refresh then login.
+      ⚠️ App is login-gated with a placeholder screen until the next step lands.)
+- [ ] Login + sign-up screens (`(auth)` route group has a placeholder login)
 - [x] SDK client: `authentication()` mode with SecureStore-backed storage adapter
       (2026-07-13: `src/lib/auth-storage.ts` — refresh token in SecureStore
       (localStorage on web), access token memory-only; client in `directus.ts` is
