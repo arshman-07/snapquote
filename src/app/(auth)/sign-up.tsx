@@ -16,42 +16,52 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Accent, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
-import { loginSchema, type LoginForm } from '@/lib/auth-schema';
+import { registerSchema, type RegisterForm } from '@/lib/auth-schema';
 
-// Turn a failed login into something the user can act on. Directus rejections
-// arrive as `{ errors: [{ message, extensions: { code } }] }`; anything else
-// is the network.
-function loginErrorMessage(error: unknown): string {
+// Map a failed sign-up to something actionable. signUp does two calls
+// (register then login), so a Directus rejection could come from either;
+// `extensions.code` tells us which. Anything without an `errors` array is the
+// network.
+function registerErrorMessage(error: unknown): string {
   if (typeof error === 'object' && error !== null && 'errors' in error) {
     const code = (error as { errors?: { extensions?: { code?: string } }[] })
       .errors?.[0]?.extensions?.code;
-    if (code === 'INVALID_CREDENTIALS') return 'Email or password is incorrect.';
-    return 'Sign-in failed — please try again.';
+    // Register no-ops on an existing email (Directus hides it to prevent
+    // enumeration), so the follow-up login fails instead — most often because
+    // the address is already taken, sometimes because the account still needs
+    // email verification.
+    if (code === 'INVALID_CREDENTIALS') {
+      return 'This email may already be registered — try signing in instead.';
+    }
+    // Public registration turned off on the server.
+    if (code === 'FORBIDDEN') return 'Sign-up isn’t available right now.';
+    return 'Sign-up failed — please try again.';
   }
   return "Couldn't reach the server — check your connection and try again.";
 }
 
-// Email/password sign-in against Directus. On success the auth context flips
-// to signedIn and the root layout's gate swaps this group out for the app.
-export default function LoginScreen() {
-  const { signIn } = useAuth();
+// Create a Directus App User account (email + password), then drop straight
+// into the app. The contractor/homeowner choice comes later, once the backend
+// has a user_type field and lets users set it on their own profile.
+export default function SignUpScreen() {
+  const { signUp } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const { control, handleSubmit, formState } = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
+  const { control, handleSubmit, formState } = useForm<RegisterForm>({
+    resolver: zodResolver(registerSchema),
     mode: 'onChange',
-    defaultValues: { email: '', password: '' },
+    defaultValues: { email: '', password: '', confirmPassword: '' },
   });
 
   const onSubmit = handleSubmit(async (values) => {
     setSubmitting(true);
     setServerError(null);
     try {
-      await signIn(values.email.trim(), values.password);
+      await signUp(values.email.trim(), values.password);
       // No navigation here — the gate unmounts this screen on success.
     } catch (error) {
-      setServerError(loginErrorMessage(error));
+      setServerError(registerErrorMessage(error));
       setSubmitting(false);
     }
   });
@@ -65,9 +75,9 @@ export default function LoginScreen() {
           style={styles.content}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ThemedView style={styles.header}>
-            <ThemedText type="subtitle">Welcome back</ThemedText>
+            <ThemedText type="subtitle">Create your account</ThemedText>
             <ThemedText themeColor="textSecondary">
-              Sign in to start quoting.
+              Sign up to start quoting.
             </ThemedText>
           </ThemedView>
 
@@ -99,16 +109,34 @@ export default function LoginScreen() {
                 error={fieldState.error?.message}
                 secureTextEntry
                 autoCapitalize="none"
-                autoComplete="current-password"
-                textContentType="password"
+                autoComplete="new-password"
+                textContentType="newPassword"
+                placeholder="At least 8 characters"
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="confirmPassword"
+            render={({ field, fieldState }) => (
+              <AuthField
+                label="Confirm password"
+                value={field.value}
+                onChangeText={field.onChange}
+                error={fieldState.error?.message}
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete="new-password"
+                textContentType="newPassword"
                 placeholder="••••••••"
                 onSubmitEditing={canSubmit ? () => onSubmit() : undefined}
               />
             )}
           />
 
-          {/* Server-side failure (bad credentials / offline) lives above the
-              button so it survives field edits until the next attempt. */}
+          {/* Server-side failure (email taken / offline / registration off)
+              lives above the button so it survives field edits until the next
+              attempt. */}
           {serverError && (
             <ThemedText type="small" style={styles.serverError}>
               {serverError}
@@ -124,7 +152,7 @@ export default function LoginScreen() {
                 <ActivityIndicator color="#fff" />
               ) : (
                 <ThemedText type="smallBold" style={styles.buttonLabel}>
-                  Sign in
+                  Create account
                 </ThemedText>
               )}
             </ThemedView>
@@ -132,12 +160,12 @@ export default function LoginScreen() {
 
           <ThemedView style={styles.footRow}>
             <ThemedText type="small" themeColor="textSecondary">
-              Don&apos;t have an account yet?{' '}
+              Already have an account?{' '}
             </ThemedText>
-            <Link href="/sign-up" asChild>
+            <Link href="/login" asChild>
               <Pressable hitSlop={8}>
                 <ThemedText type="smallBold" style={styles.footLink}>
-                  Sign up
+                  Sign in
                 </ThemedText>
               </Pressable>
             </Link>

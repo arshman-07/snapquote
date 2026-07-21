@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from 'react';
 
+import { registerUser } from '@directus/sdk';
+
 import { authStorage } from '@/lib/auth-storage';
 import { directus } from '@/lib/directus';
 import { queryClient } from '@/lib/query';
@@ -24,6 +26,7 @@ type AuthStatus = 'restoring' | 'signedIn' | 'signedOut';
 type AuthContextValue = {
   status: AuthStatus;
   signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -79,6 +82,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('signedIn');
   }, []);
 
+  const signUp = useCallback(async (email: string, password: string) => {
+    // Two steps: /users/register creates the account but returns no session,
+    // so we immediately sign in with the same credentials to get tokens and
+    // flip the gate. `registerUser` throws if public registration is disabled
+    // server-side; the sign-up screen maps that. Note Directus returns 204
+    // even when the email already exists (anti-enumeration) — in that case the
+    // register no-ops and the login below fails, which the screen surfaces.
+    await directus.request(registerUser(email, password));
+    await directus.login({ email, password });
+    // Nothing has been fetched under this identity yet, but clear for parity
+    // with signIn (drops anything cached anonymously).
+    queryClient.clear();
+    setStatus('signedIn');
+  }, []);
+
   const signOut = useCallback(async () => {
     try {
       // Best effort: invalidates the refresh token server-side and clears the
@@ -94,8 +112,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ status, signIn, signOut }),
-    [status, signIn, signOut],
+    () => ({ status, signIn, signUp, signOut }),
+    [status, signIn, signUp, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

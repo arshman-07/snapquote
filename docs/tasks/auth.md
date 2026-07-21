@@ -75,8 +75,11 @@ which resolved OQ #1/#2 and reshaped this task:
 - [ ] **Pre-work:** re-test `$CURRENT_USER` row-level filters on the live
       Directus 12 (create a test user, set `read` on `quotes` with
       `user_created = $CURRENT_USER`, probe with two accounts)
-- [ ] Enable Directus public registration into the App User role; add a
-      `user_type` (contractor/homeowner) field on users
+- [~] Enable Directus public registration into the App User role — **done
+      2026-07-21** (verified against v11 by API: `/users/register` → 204, then
+      login succeeds and the app lands signed-in). The `user_type`
+      (contractor/homeowner) field on users is still pending — deferred together
+      with the sign-up type selector.
 - [x] Auth context + gate (2026-07-13: `src/context/auth.tsx` —
       restoring/signedIn/signedOut, restore-on-launch via `directus.refresh()`
       (skipped when no stored token), signIn/signOut clear the query cache;
@@ -91,8 +94,26 @@ which resolved OQ #1/#2 and reshaped this task:
       network failure → connection message. Verified against live Directus
       (401 path); success path confirmed by the maintainer signing in from the
       app on-device, 2026-07-13.)
-- [ ] Sign-up screen with contractor/homeowner choice (needs Directus public
-      registration enabled + `user_type` field — see checklist item above)
+- [x] Sign-up screen (2026-07-21: **email + password built and verified
+      on-device** — maintainer confirmed sign-up + sign-in both work end-to-end
+      against v11 after public registration was enabled.) Details:
+      `src/app/(auth)/sign-up.tsx`. RHF + zod (`registerSchema` in
+      `auth-schema.ts`: 8-char minimum + confirm-password match; server stays
+      the final judge). Shared field chrome extracted to
+      `src/components/auth-field.tsx` (`AuthField` + `AuthErrorColor`), reused by
+      login. Flow: `signUp` in the auth context calls `registerUser` then
+      `login` — the register endpoint returns no session — clears the query
+      cache, flips the gate. Errors mapped: post-register `INVALID_CREDENTIALS`
+      → "email may already be registered" (Directus 204s on an existing email to
+      prevent enumeration, so the follow-up login is where it surfaces);
+      `FORBIDDEN` → "sign-up isn't available right now"; network → connection
+      message. Login footer's "coming soon" note replaced with a real link;
+      sign-up links back to login. ⚠️ **Needs Directus public registration
+      enabled on v11 → App User**, else the register call 403s. **Contractor/
+      homeowner choice deferred** (maintainer decision 2026-07-21): the public
+      register endpoint can't set custom fields, so `user_type` waits on a
+      `directus_users` field + App User self-update permission, then a
+      `updateMe({ user_type })` follow-up after sign-up.)
 - [x] Logout (2026-07-13: "Sign out" button in the Home header → auth context
       `signOut` → `directus.logout()` + clears SecureStore + query cache → gate
       returns to /login. Verified end-to-end on web: after sign out lands on
@@ -110,9 +131,13 @@ which resolved OQ #1/#2 and reshaped this task:
 - [ ] Auto-refresh on launch; 401 → back to login
 - [ ] Move all permissions to the App User role; strip Public back to nothing
       (decide whether `room_types` read stays public — OQ #5)
-- [ ] User scoping of quotes — server-side (row-level filters if the pre-work
-      confirms them, else compensating control; see SECURITY.md §2.2). SDK query
-      filters on top for correctness of what's displayed.
+- [x] User scoping of quotes — server-side row-level filters
+      (`user_created = $CURRENT_USER`) live on v11 since 2026-07-13. Verified via
+      API 2026-07-21: a fresh App User reads only its own quotes. Wiring the app
+      to read quotes as an authenticated user surfaced two v11 rebuild gaps
+      (empty field-read perms on `quotes`/`quote_items`, and a missing
+      `date_created` column) that broke the recent-quotes list; both fixed
+      2026-07-21 — see `directus-11-downgrade.md` and BACKEND.md.
 - [ ] Verify offline fallbacks still work behind the gate (OQ #7)
 - [ ] Run the permission-probing checklist (SECURITY.md §3.1) after lockdown,
       including cross-user probing (user A must not read user B's quotes)
@@ -128,6 +153,14 @@ which resolved OQ #1/#2 and reshaped this task:
 
 - [~] In progress — options surveyed 2026-07-03. 2026-07-13: audience widened to
       homeowners; OQ #1/#2 resolved (per-user accounts, in-app sign-up,
-      contractor/homeowner type at sign-up); step 1 done (authenticated SDK
-      client + SecureStore storage adapter). Next: auth context + gate (step 2),
-      then login screen. Row-level filter re-test before the lockdown step.
+      contractor/homeowner type at sign-up); authenticated SDK client +
+      SecureStore adapter, auth context + gate, login screen, and logout all
+      done. **2026-07-21:** email/password **sign-up screen built and verified
+      on-device**; **public registration enabled** on v11 → App User; row-level
+      quote scoping verified by API; and the two v11 rebuild gaps that broke the
+      recent-quotes list (empty field-read perms + missing `date_created`) found
+      and fixed. The auth flow — sign-up, sign-in, gated app, scoped quotes — now
+      works end-to-end against v11. **Remaining for the task:** `user_type`
+      (contractor/homeowner) field + self-update permission and the sign-up
+      selector; strip/confirm the Public policy lockdown (OQ #5); decide email
+      verification (needs a mail transport); stop the emptied v12 service.
