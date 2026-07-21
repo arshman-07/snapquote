@@ -67,5 +67,5 @@ Two audiences, one flow, tailored by a **contractor / homeowner choice at sign-u
 - [x] Project vision & stack decided
 - [x] Documentation structure created
 - [x] Phase 1: frontend placeholder shell — all five flow screens built (Dimensions, Photo, Materials, Labour, Summary), walking end-to-end (2026-06-29)
-- [~] Phase 2: Directus integration — backend live (Directus 12 + Postgres via Docker Compose; 4 collections). Done: SDK + TanStack Query foundation; Dimensions wired to `room_types` + RHF/zod validation; Labour wired to `labour_rates`; quotes + line items persist on finish; Home lists real recent quotes (2026-07-02). Remaining: auth
+- [~] Phase 2: Directus integration — backend live (Directus **11.13.4** + Postgres via Docker Compose; 4 collections — downgraded from 12 on 2026-07-13 for free row-level permissions, see [directus-11-downgrade.md](./directus-11-downgrade.md)). Done: SDK + TanStack Query foundation; Dimensions wired to `room_types` + RHF/zod validation; Labour wired to `labour_rates`; quotes + line items persist on finish; Home lists real recent quotes (2026-07-02); server-enforced `$CURRENT_USER` quote scoping on v11 (2026-07-13). Remaining: auth; stop the (emptied) v12 service. `labour_rates` seeded and frontend on v11 `:8056` (2026-07-13)
 - [ ] Phase 3: AI estimation

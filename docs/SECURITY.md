@@ -11,8 +11,24 @@ Status legend: ✅ in place · 🔜 planned/agreed · ❓ needs discussion
 
 ## 0. 🚨 CRITICAL — live account-takeover hole (found 2026-07-13)
 
-**Status: unpatched and exploitable right now.** Discovered by API probing while
-scoping the sign-up screen. Two settings combine into a full compromise:
+> **Update (2026-07-13, later the same day): migrated to Directus 11.13.4 — the
+> hole does not exist on the new live instance.** On v11 (port 8056) the App User
+> policy has **no `directus_users` access at all**, and `quotes`/`quote_items` are
+> server-scoped with `$CURRENT_USER` item filters (free on v11's BSL license — the
+> paywall that caused the "All Access" workaround is gone). See
+> `directus-11-downgrade.md`. **Second update (same day): the v12 instance was
+> emptied entirely** — nothing left in it; public reads on its old collections
+> return FORBIDDEN (verified by API probe). That removes the data exposure. Two
+> residuals until the v12 container is stopped: its `/users/register` endpoint is
+> **still enabled** (verified — probe with invalid payload returned a validation
+> error, not 403), so the empty instance remains a registerable foothold; and it
+> was not verified whether the probe users / admin `first_name` were part of the
+> wipe.
+
+**Status: fixed on the live v11 instance (8056); v12 (8055) emptied of all data
+but still running with registration enabled — stop the container to close it
+out.** Discovered by API probing while scoping the sign-up screen. Two settings
+combined into a full compromise:
 
 1. **Public registration is enabled** — `POST /users/register` (204) lets anyone
    on the network create an App User account, no approval.
@@ -82,14 +98,17 @@ The starting point, so we know what we're fixing:
 - **API is HTTP, not HTTPS** — Directus at `http://192.168.1.116:8055` (LAN) /
   `http://100.64.144.41:8055` (Tailscale). Traffic is unencrypted; Tailscale
   encrypts the tunnel, the LAN address does not.
-- **Public policy is wide open (temporary)** — unauthenticated read on
-  `room_types` + `labour_rates`, unauthenticated **create + read on `quotes` +
-  `quote_items`**. Anyone who can reach the API can read every quote and insert
-  arbitrary rows.
-- **No auth in the app** — no login, no tokens, no user identity.
-- **No row-level security available** — `$CURRENT_USER` filters aren't available
-  on this Directus 12 plan; user scoping can only live in frontend query filters,
-  which are advisory (any API client can ignore them).
+- **Public policy** — on v11 (2026-07-13): Read on `room_types` only. The legacy
+  v12 instance at `:8055` was emptied the same day (its old public surface now
+  returns FORBIDDEN); its container still runs with registration enabled —
+  pending shutdown.
+- **No auth in the app** — no login, no tokens, no user identity. The frontend
+  now points at the v11 instance (`EXPO_PUBLIC_DIRECTUS_URL` = `:8056`,
+  2026-07-13).
+- **Row-level security now available (2026-07-13)** — after the downgrade to
+  Directus 11, `$CURRENT_USER` item filters are free and applied: `quotes`
+  Read/Update scoped to `user_created equals $CURRENT_USER`, `quote_items` via
+  `quote.user_created`. Scoping is server-enforced, no longer advisory.
 - **No rate limiting / cost controls** — relevant once Phase 3 AI estimation
   exists (paid API per estimate).
 
@@ -113,14 +132,12 @@ The starting point, so we know what we're fixing:
   (OPEN-QUESTIONS #5).
 - 🔜 **App User role** as the only path to data: read reference collections,
   CRU on quotes/items. No delete unless we decide quotes are deletable in-app.
-- 🔜 **Server-side quote scoping is now mandatory** (2026-07-13): the app is
-  opening to public homeowner sign-ups, so "any authenticated user can read all
-  quotes" is no longer acceptable. First step: re-verify on the live Directus 12
-  whether `$CURRENT_USER` row-level permission filters actually work (the earlier
-  finding that they're unavailable predates this requirement and must be
-  re-tested). If truly unavailable, design a compensating control (e.g. a Directus
-  flow/hook or companion endpoint that injects the user filter server-side).
-  Blocks the auth task (`docs/tasks/auth.md`).
+- ✅ **Server-side quote scoping** (required 2026-07-13, done same day): resolved
+  by downgrading to Directus 11.13.4, where `$CURRENT_USER` row-level filters are
+  free. `quotes` Read/Update scoped to `user_created equals $CURRENT_USER`
+  (`user_created` is M2O → `directus_users` with On Create = "Save Current User
+  ID"); `quote_items` scoped via the relational path `quote.user_created equals
+  $CURRENT_USER`. Still to verify with a real registered user once auth lands.
 - ❓ **Admin account hygiene** — strong unique password on the Directus admin,
   admin UI not exposed beyond LAN/Tailscale, static admin tokens avoided.
 
@@ -226,3 +243,8 @@ the sections above.
   hard requirement (§2.2); HTTPS (§2.1) moves from "decide eventually" to
   "required before public users" — a public app cannot ship pointing at plain
   HTTP on a LAN/Tailscale address.
+- 2026-07-13 — **Downgraded to Directus 11.13.4** (port 8056, separate DB) instead
+  of paying for / grant-licensing v12's row-level filters. Server-side quote
+  scoping is now in place (§2.2); §0's hole doesn't exist on v11 (App User has no
+  `directus_users` access) but stays live on the legacy v12 instance at `:8055`
+  until v12 is retired.
