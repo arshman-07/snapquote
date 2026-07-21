@@ -24,6 +24,12 @@ Status legend: ✅ in place · 🔜 planned/agreed · ❓ needs discussion
 > error, not 403), so the empty instance remains a registerable foothold; and it
 > was not verified whether the probe users / admin `first_name` were part of the
 > wipe.
+>
+> **Third update (2026-07-21): public registration is now _intentionally_ enabled
+> on v11** as the app's in-app sign-up path (into the App User role). This is safe
+> on v11 precisely because the App User policy has **no `directus_users` access** —
+> the registration + All-Access-on-users combination that made it a hole on v12
+> does not exist here. Sign-up and sign-in verified on-device the same day.
 
 **Status: fixed on the live v11 instance (8056); v12 (8055) emptied of all data
 but still running with registration enabled — stop the container to close it
@@ -95,20 +101,24 @@ or in app state. **Needs a decision before the sign-up screen is built.**
 
 The starting point, so we know what we're fixing:
 
-- **API is HTTP, not HTTPS** — Directus at `http://192.168.1.116:8055` (LAN) /
-  `http://100.64.144.41:8055` (Tailscale). Traffic is unencrypted; Tailscale
-  encrypts the tunnel, the LAN address does not.
-- **Public policy** — on v11 (2026-07-13): Read on `room_types` only. The legacy
-  v12 instance at `:8055` was emptied the same day (its old public surface now
-  returns FORBIDDEN); its container still runs with registration enabled —
-  pending shutdown.
-- **No auth in the app** — no login, no tokens, no user identity. The frontend
-  now points at the v11 instance (`EXPO_PUBLIC_DIRECTUS_URL` = `:8056`,
-  2026-07-13).
-- **Row-level security now available (2026-07-13)** — after the downgrade to
-  Directus 11, `$CURRENT_USER` item filters are free and applied: `quotes`
-  Read/Update scoped to `user_created equals $CURRENT_USER`, `quote_items` via
-  `quote.user_created`. Scoping is server-enforced, no longer advisory.
+- **API is HTTP, not HTTPS** — live v11 Directus at `http://192.168.1.116:8056`
+  (LAN) / `http://100.64.144.41:8056` (Tailscale). Traffic is unencrypted;
+  Tailscale encrypts the tunnel, the LAN address does not.
+- **Public policy** — on v11: Read on `room_types` only. The legacy v12 instance
+  at `:8055` was emptied 2026-07-13 (its old public surface now returns
+  FORBIDDEN); its container still runs with registration enabled — pending
+  shutdown.
+- **Auth in the app (2026-07-21)** — email/password login **and sign-up** with a
+  full login gate; refresh token in SecureStore, per-user sessions. Public
+  registration into the App User role is enabled on v11 (intentional — see §0).
+  Frontend points at v11 (`EXPO_PUBLIC_DIRECTUS_URL` = `:8056`).
+- **Row-level security in force (2026-07-13, verified 2026-07-21)** — after the
+  downgrade to Directus 11, `$CURRENT_USER` item filters are free and applied:
+  `quotes` Read/Update scoped to `user_created equals $CURRENT_USER`,
+  `quote_items` via `quote.user_created`. Server-enforced, not advisory; an API
+  probe with a fresh App User confirmed it reads only its own quotes. (Wiring the
+  app also exposed two v11-rebuild gaps — empty field-read perms and a missing
+  `date_created` column — both fixed 2026-07-21; see `directus-11-downgrade.md`.)
 - **No rate limiting / cost controls** — relevant once Phase 3 AI estimation
   exists (paid API per estimate).
 
@@ -127,9 +137,10 @@ The starting point, so we know what we're fixing:
 
 ### 2.2 API access control (Directus)
 
-- 🔜 **Lock down the Public policy** once auth lands: strip create/read on
-  `quotes`/`quote_items`; decide whether `room_types` read stays public
-  (OPEN-QUESTIONS #5).
+- ✅/❓ **Public policy** — on the v11 rebuild it was already minimal: Read on
+  `room_types` only, no `quotes`/`quote_items` access (the v12 pre-auth widening
+  was never carried over). Open decision remaining: whether `room_types` read
+  stays public at all (OPEN-QUESTIONS #5).
 - 🔜 **App User role** as the only path to data: read reference collections,
   CRU on quotes/items. No delete unless we decide quotes are deletable in-app.
 - ✅ **Server-side quote scoping** (required 2026-07-13, done same day): resolved
@@ -137,7 +148,10 @@ The starting point, so we know what we're fixing:
   free. `quotes` Read/Update scoped to `user_created equals $CURRENT_USER`
   (`user_created` is M2O → `directus_users` with On Create = "Save Current User
   ID"); `quote_items` scoped via the relational path `quote.user_created equals
-  $CURRENT_USER`. Still to verify with a real registered user once auth lands.
+  $CURRENT_USER`. **Verified 2026-07-21** by API with a freshly registered App
+  User — reads only its own quotes. (The App User Read permission must also grant
+  the individual fields, not just the row filter; the rebuild left that empty and
+  broke the app's list queries until fixed 2026-07-21.)
 - ❓ **Admin account hygiene** — strong unique password on the Directus admin,
   admin UI not exposed beyond LAN/Tailscale, static admin tokens avoided.
 

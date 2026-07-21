@@ -1,5 +1,15 @@
 # Questions for a senior dev — Directus auth & scoping
 
+> **✅ Largely resolved 2026-07-21 — kept for the record.** The core blocker (#1,
+> #4, #5: paywalled row-level filters on Directus 12 and the resulting
+> account-takeover hole) was solved by **downgrading to Directus 11.13.4**, where
+> `$CURRENT_USER` filters are free. Server-side quote scoping is live and verified,
+> public registration + in-app email/password sign-up work end-to-end, and the App
+> User has no `directus_users` access. See `directus-11-downgrade.md`, SECURITY.md
+> §0, and `tasks/auth.md`. Still genuinely open: **#3** — storing `user_type`
+> (contractor/homeowner) at sign-up (the register endpoint can't set custom
+> fields; needs a `directus_users` field + App User self-update, then `updateMe`).
+
 Prepared 2026-07-13, while finishing Phase 2 auth. The two questions that
 actually unblock the build are **#1 and #3**; **#4** is the big-picture one
 worth an honest opinion. Paste his answers back into the project and they get

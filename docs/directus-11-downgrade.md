@@ -106,10 +106,14 @@ Executed Option B. Done:
 
 Remaining:
 
-- Auth work: enable public registration → App User role; decide `directus_users`
-  self-scoping (Read/Update with `id = $CURRENT_USER`, `role`/`policies` fields
-  excluded) — currently App User has no `directus_users` access at all on v11.
-- Run the step-7 verification checklist with a real registered user.
+- ~~Enable public registration → App User role~~ — **done 2026-07-21** (verified:
+  `/users/register` → 204, login succeeds, app lands signed-in). In-app
+  email/password sign-up now works end-to-end.
+- `directus_users` self-scoping still open (Read/Update with `id = $CURRENT_USER`,
+  `role`/`policies` fields excluded) — App User still has no `directus_users`
+  access on v11. Needed before the sign-up screen can set `user_type`.
+- Step-7 verification: row scoping confirmed by API 2026-07-21 (a fresh App User
+  reads only its own quotes); full on-device cross-user pass still to run.
 - **Stop the v12 service.** Its data was emptied on 2026-07-13 (nothing left,
   no fallback value), which neutralized the SECURITY.md data exposure — but its
   `/users/register` endpoint is **still enabled** (verified by API probe), so the
@@ -124,6 +128,31 @@ Done since:
   switched to `:8056` (v11).
 - ~~v12 fallback data~~ — v12 emptied 2026-07-13; public reads on its old
   collections now return FORBIDDEN (verified by API probe).
+
+## Post-wiring fixes (2026-07-21) — two hand-rebuild gaps found via the app
+
+Wiring the app to v11 (email/password sign-up now works) surfaced why the
+recent-quotes list showed "couldn't load" for a signed-in user. Both traced to
+the by-hand collection rebuild, not the app (verified by probing the REST API as
+a freshly registered App User):
+
+1. **`quotes` Read policy had no field-level access.** The row filter
+   (`user_created = $CURRENT_USER`) was set, but the readable-field list was
+   empty, so reads returned only the primary key (`fields=*` → `{"data":[7]}`)
+   and any `sort` 403'd. Fixed by granting field read on all `quotes` /
+   `quote_items` fields.
+2. **`date_created` was never recreated on `quotes`.** Only `user_created` had
+   been re-added by hand; `date_created` 403'd with "field … does not exist"
+   while `user_created` beside it read fine. The app both sorts by and displays
+   it. Fixed by re-adding `date_created` as a Timestamp with the "Save Current
+   Date/Time" special (the timestamp analogue of `user_created`'s "Save Current
+   User ID"), then granting read on it (it's a system-managed field, listed
+   separately in the field-perms editor — easy to miss).
+
+After both fixes the exact app query
+(`fields=…,date_created,status&sort=-date_created`) returns **200 with data** and
+a populated timestamp. No app code changed. Note: `quotes` rows created before
+the field was added carry `date_created = null` (Directus doesn't backfill).
 
 ## Sources
 

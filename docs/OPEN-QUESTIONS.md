@@ -32,13 +32,15 @@ decisions into the relevant task docs.
    keep `room_types` read for pre-login flows if we allow any). Everything moves to
    the App User role. Confirm nothing should stay public.
 
-6. **User scoping of quotes.** ⚠️ **Escalated 2026-07-13:** with public sign-up,
-   users are strangers — each account must only ever see its own quotes. Frontend
-   SDK filters (advisory) are **not sufficient**; server-side enforcement is now a
-   hard requirement. Re-verify on the live Directus 12 whether `$CURRENT_USER`
-   row-level filters are truly unavailable (re-test before building auth); if they
-   are, we need a compensating server-side control (SECURITY.md §2.2). This blocks
-   the auth lockdown.
+6. **User scoping of quotes.** ✅ **Resolved 2026-07-13, verified 2026-07-21.**
+   The requirement stands (with public sign-up, each account must only see its own
+   quotes, and frontend SDK filters are not sufficient), and the downgrade to
+   Directus 11 supplied the server-side enforcement: `$CURRENT_USER` row-level
+   filters are free on v11 and applied to `quotes`/`quote_items`. An API probe
+   with a fresh App User confirmed it reads only its own quotes. Note: the Read
+   permission must also grant the individual fields — the v11 rebuild left that
+   empty (and was missing the `date_created` column), which broke the recent-
+   quotes list until both were fixed 2026-07-21. See `directus-11-downgrade.md`.
 
 7. **Offline behaviour once authed.** Today's offline fallbacks (static chips/rates,
    finish-without-saving) — keep as-is behind the login gate? (Recommended: yes,

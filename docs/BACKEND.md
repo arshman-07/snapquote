@@ -90,6 +90,18 @@ pm2 keeps it alive across reboots.
 > `labour_rates` seeded 2026-07-13 with the app's preset rates (300/450/600 USD).
 > `quotes.user_created` was added manually (M2O → `directus_users`, On Create =
 > "Save Current User ID") since the hand rebuild didn't include it.
+>
+> **Two more gaps from the hand rebuild surfaced 2026-07-21** when the app first
+> read quotes as an authenticated App User (recent-quotes list showed "couldn't
+> load"): (1) `date_created` was never recreated — only `user_created` had been —
+> so `sort=-date_created` 403'd with "field … does not exist"; (2) the App User
+> **Read** policy on `quotes`/`quote_items` granted **no field-level access**, so
+> reads returned only the primary key. Both fixed 2026-07-21 — `date_created`
+> re-added as a Timestamp with the "Save Current Date/Time" special, and field
+> read granted on all needed `quotes`/`quote_items` fields (incl. `date_created`,
+> which is a system-managed field listed separately in the field-perms editor and
+> was easy to miss). Row scoping (`user_created = $CURRENT_USER`) had been correct
+> all along; the gaps were purely the missing column and empty field reads.
 
 - `room_types` — id, sort, name (string, required). Seeded: Bedroom, Bathroom, Kitchen,
   Living Room, Flooring, Painting.
@@ -114,7 +126,10 @@ pm2 keeps it alive across reboots.
   **`user_created equals $CURRENT_USER`** — server-enforced row-level scoping.
   `quote_items` scoped via the relational path **`quote.user_created equals
   $CURRENT_USER`** rather than its own `user_created` field. No `directus_users`
-  access (self-scoped Read/Update to be added when auth lands).
+  access (self-scoped Read/Update to be added when auth lands). **The `quotes`/
+  `quote_items` Read permissions must grant the individual fields, not just the
+  row filter** — the rebuild originally left the field list empty, which broke the
+  app's list queries until fixed 2026-07-21 (see the schema note above).
 - ✅ **Row-level filters now work at no cost** — they were paywalled on self-hosted
   Directus 12 (the reason for the downgrade); on v11 they are free. Frontend-side
   user scoping is no longer the enforcement mechanism.
