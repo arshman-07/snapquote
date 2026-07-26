@@ -130,11 +130,17 @@ pm2 keeps it alive across reboots.
 - **App User** — Read on `room_types` + `labour_rates`; Create on `quotes` +
   `quote_items`; Read/Update on `quotes` scoped with a custom Item Permission filter
   **`user_created equals $CURRENT_USER`** — server-enforced row-level scoping.
-  `quote_items` scoped via the relational path **`quote.user_created equals
-  $CURRENT_USER`** rather than its own `user_created` field. **The `quotes`/
+  `quote_items` **Read** scoped via the relational path **`quote.user_created
+  equals $CURRENT_USER`** rather than its own `user_created` field. **The `quotes`/
   `quote_items` Read permissions must grant the individual fields, not just the
   row filter** — the rebuild originally left the field list empty, which broke the
-  app's list queries until fixed 2026-07-21 (see the schema note above).
+  app's list queries until fixed 2026-07-21 (see the schema note above). The
+  `quotes` **Update** field list was also missing `job_type` (users couldn't edit
+  the job type on their own quote) — **added 2026-07-26**.
+  ⚠️ **`quote_items` Create is NOT owner-scoped** — create-time rules can't
+  traverse `quote.user_created`, so an App User can currently attach items to
+  another user's quote. Open security finding; compensating control planned — see
+  SECURITY.md §2.2 / §2.2a.
   **`directus_users` self-access (pending — add on the server for the sign-up
   profile):** Read + Update on `directus_users`, item filter **`id equals
   $CURRENT_USER`**, both **field-limited to `user_type`, `full_name`,

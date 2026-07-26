@@ -8,6 +8,27 @@ scope quotes to the signed-in account. The last remaining Phase 2 section.
 Related: `docs/OPEN-QUESTIONS.md` (Phase 2 §7, questions 1–7) and
 `docs/SECURITY.md` (§2.2 API lockdown, §2.3 sessions — both blocked on this task).
 
+## ⚠️ NEXT SESSION — DO FIRST (from the 2026-07-26 permission probing)
+
+Ordered by priority; tackle before any new feature work:
+
+1. **❌ SECURITY: close the `quote_items` create gap.** Any App User can attach
+   fabricated line items to another user's quote (`POST /items/quote_items` with
+   someone else's `quote` id → 200). Create-time Directus rules can't traverse
+   `quote.user_created`, so this needs a compensating control — a Directus Flow
+   or a filter-hook extension that rejects when the referenced quote isn't the
+   caller's. Options + tradeoffs in `SECURITY.md` §2.2a; **approach not yet
+   chosen** (Flow vs hook extension). Re-run `scripts/probe-permissions.sh` after
+   — the "POST item onto B's quote" probe must flip to PASS.
+2. **Confirm `GET /users` self-filters the body.** It returns 200 for an App User
+   (not 403); verify the response contains only the caller's own record. The
+   probe script now asserts B's id is absent from A's `/users` response — just
+   run it and confirm that row is PASS.
+3. **Backend for the sign-up profile (`user_type`).** Add the `directus_users`
+   fields + App User self Read/Update (field-limited) per `BACKEND.md`, then set
+   `RUN_PROFILE_PROBES=true` and re-run the probe script; verify a new sign-up
+   persists `user_type`/`full_name`/`company_name`.
+
 ## Implementation options (surveyed 2026-07-03)
 
 Ordered by fit for the current stack (self-hosted Directus 12, existing App User
@@ -194,8 +215,27 @@ which resolved OQ #1/#2 and reshaped this task:
       `date_created` column) that broke the recent-quotes list; both fixed
       2026-07-21 — see `directus-11-downgrade.md` and BACKEND.md.
 - [ ] Verify offline fallbacks still work behind the gate (OQ #7)
-- [ ] Run the permission-probing checklist (SECURITY.md §3.1) after lockdown,
-      including cross-user probing (user A must not read user B's quotes)
+- [~] Run the permission-probing checklist (SECURITY.md §3.1) after lockdown,
+      including cross-user probing (user A must not read user B's quotes).
+      **Runner built 2026-07-26:** `scripts/probe-permissions.sh` automates the
+      Group A–D matrix (unauthenticated surface, own-data CRU, cross-user +
+      privilege denials incl. escalation via `PATCH /users/me`, garbage token)
+      plus a content assertion that B's quote never appears in A's list. Group E
+      (`/users/me` profile writes) is gated behind `RUN_PROFILE_PROBES=true` for
+      after the `directus_users` backend step.
+      **Run 2026-07-26** against v11 with two registered test users: most probes
+      pass — unauthenticated access blocked everywhere, cross-user quote
+      read/update/delete denied, system endpoints (roles/policies/permissions)
+      inaccessible, self-escalation via `PATCH /users/me` (role/email/password)
+      blocked, garbage token rejected, and quote-list isolation confirmed (B's
+      quote absent from A's list). Two items surfaced:
+      • **Fixed:** `quotes` Update was missing `job_type` in its field permissions.
+      • **❌ OPEN — `quote_items` create isn't owner-scoped:** an App User can POST
+        a `quote_item` onto another user's quote (200, expected 403/404).
+        Directus create rules can't traverse `quote.user_created`. Compensating
+        control needed (Directus Flow / hook extension) — see SECURITY.md §2.2a.
+      • **Confirm:** `GET /users` returns 200 (self-filtered) not 403 — verify the
+        body contains only the caller (probe now asserts this).
 
 ## Open questions
 

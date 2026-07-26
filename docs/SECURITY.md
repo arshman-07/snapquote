@@ -152,8 +152,53 @@ The starting point, so we know what we're fixing:
   User — reads only its own quotes. (The App User Read permission must also grant
   the individual fields, not just the row filter; the rebuild left that empty and
   broke the app's list queries until fixed 2026-07-21.)
+- ❌ **OPEN — `quote_items` create isn't owner-scoped (found 2026-07-26 by
+  `scripts/probe-permissions.sh`).** An authenticated App User can `POST
+  /items/quote_items` with `quote` set to **another user's** quote id and it
+  succeeds (200), attaching fabricated line items to a quote they don't own — an
+  integrity/tampering hole, though not a read leak (cross-user *reads* of quotes
+  and items are correctly denied). Root cause: Directus create-time Field
+  Validation / permission filters only see fields on the incoming payload and
+  **can't traverse the M2O** to `quote.user_created`, so a same-collection rule
+  can't express "the referenced quote must be mine." (A rule on the item's own
+  `user_created` wouldn't help anyway — the attacker's item legitimately has
+  *their* id; the check must be on the *quote's* owner. The `user_created` preset
+  possibly populating after validation is a secondary red herring.) **Fix
+  required before wider launch — options in §2.2a below.** Read-side scoping means
+  the victim would see the bogus items on their own quote.
+- ❓ **`GET /users` returns 200 for an App User (needs body confirmation).** The
+  list endpoint responds 200 rather than 403; this is expected Directus behaviour
+  *if* the self-scoped Read Item Permission (`id = $CURRENT_USER`) filters the
+  body to only the caller's own record. Confirm by inspecting the response body:
+  it must contain only the caller and no other users. (The probe script now
+  asserts B's id is absent from A's `/users` response.)
+- ✅ **`quotes` update field coverage** — fixed 2026-07-26: `job_type` was missing
+  from the `quotes` Update allowed Field Permissions, so users couldn't edit it on
+  their own quotes; added.
 - ❓ **Admin account hygiene** — strong unique password on the Directus admin,
   admin UI not exposed beyond LAN/Tailscale, static admin tokens avoided.
+
+#### 2.2a Compensating control for `quote_items` create scoping (planned)
+
+The check must load the referenced quote and confirm its `user_created` matches
+the caller, which needs relation access at write time. Candidate approaches:
+
+- **Directus Flow — Filter (blocking) on `quote_items.items.create`.** No-code,
+  lives in the admin. Reads the referenced quote(s), compares `user_created` to
+  the trigger's accountability user, and rejects otherwise. Must handle the
+  **batch** payload the app sends (`createItems`) and the array shape, and needs a
+  Read-Data step (the sandboxed Run-Script op has no DB access).
+- **Custom hook extension — `filter('quote_items.items.create', …)`.** Uses the
+  `ItemsService` to load the quote and throw a `ForbiddenError` on mismatch.
+  Robust, handles batch cleanly, but is a code extension to build and deploy into
+  the Directus container.
+- **Nested-only creation.** Stop the app creating items via a standalone
+  `POST /items/quote_items` and instead nest them under the quote create/update
+  (O2M), so the quote's own owner-scope governs. Reduces the standalone attack
+  surface but Directus still checks `quote_items` create permission on nested
+  items, so it's a defence-in-depth measure, not a complete fix on its own —
+  pair it with one of the above. This one also touches the frontend
+  (`useSaveQuote`).
 
 ### 2.3 Authentication & session handling (Phase 2 §7)
 
@@ -206,6 +251,21 @@ How we verify the measures above. No test suite exists yet; these start as
 manual checklists and graduate to automation where it pays.
 
 ### 3.1 Manual API probing (curl / Bruno / Postman)
+
+Automated by **`scripts/probe-permissions.sh`** (Git Bash + curl). It logs in as
+two App Users A and B, then runs the matrix below and prints PASS/FAIL vs the
+expected HTTP status, ending with a tally (non-zero exit on any failure). Re-run
+after each permissions change:
+
+```bash
+BASE_URL=http://100.64.144.41:8056 \
+  EMAIL_A=a@example.com PASS_A=… EMAIL_B=b@example.com PASS_B=… \
+  bash scripts/probe-permissions.sh
+```
+
+Set `RUN_PROFILE_PROBES=true` once the `directus_users` profile fields + App User
+self Read/Update permissions exist, so the run also verifies those. The script
+carries no credentials (env-var driven; placeholder defaults only).
 
 Run against the live API after each permissions change:
 
