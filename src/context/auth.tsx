@@ -10,11 +10,21 @@ import {
 } from 'react';
 import { AppState } from 'react-native';
 
-import { registerUser } from '@directus/sdk';
+import { registerUser, updateMe } from '@directus/sdk';
 
 import { authStorage } from '@/lib/auth-storage';
-import { directus } from '@/lib/directus';
+import { directus, type AppUserProfile } from '@/lib/directus';
 import { queryClient, setSessionExpiredHandler } from '@/lib/query';
+
+// What the sign-up screen collects: credentials plus the little profile the
+// account type drives (company name only applies to contractors).
+export type SignUpInput = {
+  email: string;
+  password: string;
+  userType: 'contractor' | 'homeowner';
+  fullName: string;
+  companyName?: string;
+};
 
 // Session state for the whole app. The root layout renders the login gate off
 // `status`, so everything below it can assume a signed-in Directus client.
@@ -28,7 +38,7 @@ type AuthStatus = 'restoring' | 'signedIn' | 'signedOut';
 type AuthContextValue = {
   status: AuthStatus;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (input: SignUpInput) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -84,7 +94,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('signedIn');
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string) => {
+  const signUp = useCallback(async (input: SignUpInput) => {
+    const { email, password, userType, fullName, companyName } = input;
     // Two steps: /users/register creates the account but returns no session,
     // so we immediately sign in with the same credentials to get tokens and
     // flip the gate. `registerUser` throws if public registration is disabled
@@ -93,6 +104,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // register no-ops and the login below fails, which the screen surfaces.
     await directus.request(registerUser(email, password));
     await directus.login({ email, password });
+
+    // The public register endpoint can't set custom fields, so we write the
+    // profile onto the now-authenticated session. Best-effort: if this fails
+    // (e.g. the App User role isn't allowed to self-update yet), the user is
+    // still signed in — the profile can be completed later rather than trapping
+    // them on the sign-up screen.
+    try {
+      const patch: Partial<AppUserProfile> = {
+        user_type: userType,
+        full_name: fullName.trim(),
+      };
+      if (userType === 'contractor') patch.company_name = companyName?.trim() ?? '';
+      await directus.request(updateMe(patch));
+    } catch (error) {
+      console.warn('Could not save sign-up profile fields:', error);
+    }
+
     // Nothing has been fetched under this identity yet, but clear for parity
     // with signIn (drops anything cached anonymously).
     queryClient.clear();

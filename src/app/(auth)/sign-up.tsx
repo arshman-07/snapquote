@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'expo-router';
 import { useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -40,9 +40,10 @@ function registerErrorMessage(error: unknown): string {
   return "Couldn't reach the server — check your connection and try again.";
 }
 
-// Create a Directus App User account (email + password), then drop straight
-// into the app. The contractor/homeowner choice comes later, once the backend
-// has a user_type field and lets users set it on their own profile.
+// Create a Directus App User account (email + password) plus a small profile —
+// account type and a name, and for contractors a company name — then drop
+// straight into the app. The profile fields are written after login (the public
+// register endpoint can't set them); see `signUp` in the auth context.
 export default function SignUpScreen() {
   const { signUp } = useAuth();
   const [submitting, setSubmitting] = useState(false);
@@ -51,14 +52,31 @@ export default function SignUpScreen() {
   const { control, handleSubmit, formState } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
     mode: 'onChange',
-    defaultValues: { email: '', password: '', confirmPassword: '' },
+    defaultValues: {
+      userType: undefined,
+      fullName: '',
+      companyName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
   });
+
+  // Drives which profile fields show and how the name field is labelled.
+  const userType = useWatch({ control, name: 'userType' });
 
   const onSubmit = handleSubmit(async (values) => {
     setSubmitting(true);
     setServerError(null);
     try {
-      await signUp(values.email.trim(), values.password);
+      // Schema guarantees userType is set before submit is reachable.
+      await signUp({
+        email: values.email.trim(),
+        password: values.password,
+        userType: values.userType!,
+        fullName: values.fullName,
+        companyName: values.companyName,
+      });
       // No navigation here — the gate unmounts this screen on success.
     } catch (error) {
       setServerError(registerErrorMessage(error));
@@ -80,6 +98,85 @@ export default function SignUpScreen() {
               Sign up to start quoting.
             </ThemedText>
           </ThemedView>
+
+          {/* Account type — decides which profile fields apply below. */}
+          <Controller
+            control={control}
+            name="userType"
+            render={({ field, fieldState }) => (
+              <ThemedView style={styles.field}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  I’m a…
+                </ThemedText>
+                <ThemedView style={styles.segment}>
+                  {(['contractor', 'homeowner'] as const).map((type) => {
+                    const selected = field.value === type;
+                    return (
+                      <Pressable
+                        key={type}
+                        onPress={() => field.onChange(type)}
+                        style={styles.segmentPressable}>
+                        <ThemedView
+                          type="backgroundElement"
+                          style={[
+                            styles.segmentItem,
+                            selected && styles.segmentItemSelected,
+                          ]}>
+                          <ThemedText
+                            type="smallBold"
+                            style={selected ? styles.segmentLabelSelected : undefined}>
+                            {type === 'contractor' ? 'Contractor' : 'Homeowner'}
+                          </ThemedText>
+                        </ThemedView>
+                      </Pressable>
+                    );
+                  })}
+                </ThemedView>
+                {fieldState.error && (
+                  <ThemedText type="small" style={styles.serverError}>
+                    {fieldState.error.message}
+                  </ThemedText>
+                )}
+              </ThemedView>
+            )}
+          />
+
+          {/* Contractors give a company name; the name field below then asks
+              for the owner. Homeowners just give their own name. */}
+          {userType === 'contractor' && (
+            <Controller
+              control={control}
+              name="companyName"
+              render={({ field, fieldState }) => (
+                <AuthField
+                  label="Company name"
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  error={fieldState.error?.message}
+                  autoCapitalize="words"
+                  autoComplete="organization"
+                  placeholder="Acme Renovations"
+                />
+              )}
+            />
+          )}
+          {userType && (
+            <Controller
+              control={control}
+              name="fullName"
+              render={({ field, fieldState }) => (
+                <AuthField
+                  label={userType === 'contractor' ? "Company owner’s name" : 'Your name'}
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  error={fieldState.error?.message}
+                  autoCapitalize="words"
+                  autoComplete="name"
+                  placeholder="Jane Smith"
+                />
+              )}
+            />
+          )}
 
           <Controller
             control={control}
@@ -198,6 +295,27 @@ const styles = StyleSheet.create({
   },
   serverError: {
     color: AuthErrorColor,
+  },
+  field: {
+    gap: Spacing.one,
+  },
+  segment: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  segmentPressable: {
+    flex: 1,
+  },
+  segmentItem: {
+    paddingVertical: Spacing.three,
+    borderRadius: Spacing.three,
+    alignItems: 'center',
+  },
+  segmentItemSelected: {
+    backgroundColor: Accent,
+  },
+  segmentLabelSelected: {
+    color: '#fff',
   },
   button: {
     backgroundColor: Accent,

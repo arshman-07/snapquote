@@ -49,11 +49,24 @@ export type QuoteItem = {
   amount: number;
 };
 
+// Custom fields we add to the built-in users collection. Declaring
+// `directus_users` in the Schema lets the SDK merge these onto the standard
+// user type, so `updateMe`/`readMe` accept and return them. Set once at sign-up;
+// `user_type` decides which of the other two apply — homeowner → `full_name`
+// (their name); contractor → `company_name` + `full_name` (the owner's name).
+export type AppUserProfile = {
+  id: string;
+  user_type: 'contractor' | 'homeowner' | null;
+  full_name: string | null;
+  company_name: string | null;
+};
+
 export type Schema = {
   room_types: RoomType[];
   labour_rates: LabourRate[];
   quotes: Quote[];
   quote_items: QuoteItem[];
+  directus_users: AppUserProfile[];
 };
 
 // Base URL comes from EXPO_PUBLIC_DIRECTUS_URL (inlined at build time by Expo).

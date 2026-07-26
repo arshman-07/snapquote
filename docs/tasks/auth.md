@@ -109,11 +109,28 @@ which resolved OQ #1/#2 and reshaped this task:
       `FORBIDDEN` → "sign-up isn't available right now"; network → connection
       message. Login footer's "coming soon" note replaced with a real link;
       sign-up links back to login. ⚠️ **Needs Directus public registration
-      enabled on v11 → App User**, else the register call 403s. **Contractor/
-      homeowner choice deferred** (maintainer decision 2026-07-21): the public
-      register endpoint can't set custom fields, so `user_type` waits on a
-      `directus_users` field + App User self-update permission, then a
-      `updateMe({ user_type })` follow-up after sign-up.)
+      enabled on v11 → App User**, else the register call 403s.)
+- [~] Sign-up profile (account type + names) — **frontend built 2026-07-26,
+      backend pending.** The contractor/homeowner choice (deferred 2026-07-21) is
+      now collected at sign-up along with a name, and a company name for
+      contractors. Reuses one `full_name` for "the person" (homeowner's name /
+      contractor's owner name); `company_name` is contractor-only.
+      • Schema: `AppUserProfile` added to `src/lib/directus.ts` (declares the
+        custom `directus_users` fields so `updateMe` is typed).
+      • Validation: `registerSchema` now uses a `superRefine` with type-dependent
+        rules (`userType` required; `fullName` required with a label-appropriate
+        message; `companyName` required only for contractors).
+      • UI (`sign-up.tsx`): a two-option segmented selector (Contractor /
+        Homeowner) drives which fields render — contractor sees Company name +
+        Company owner's name, homeowner sees Your name.
+      • Flow: `signUp` now takes a `SignUpInput` object and, after login, writes
+        the profile via `updateMe` — **best-effort** (a failure just `console.warn`s
+        and the user is still signed in; the profile isn't saved). All fields for
+        the chosen path are required client-side.
+      • ⚠️ **Backend pending (on the server):** add the `user_type` / `full_name`
+        / `company_name` fields to `directus_users` and grant App User self
+        Read+Update field-limited to them with filter `id = $CURRENT_USER` — see
+        BACKEND.md "Access policies". Until then `updateMe` 403s (caught).
 - [x] Logout (2026-07-13: "Sign out" button in the Home header → auth context
       `signOut` → `directus.logout()` + clears SecureStore + query cache → gate
       returns to /login. Verified end-to-end on web: after sign out lands on

@@ -115,6 +115,12 @@ pm2 keeps it alive across reboots.
   was already sending it; earlier rows backfilled to draft).
 - `quote_items` — id, kind (dropdown: material/labour), label (string), amount (float),
   quote (M2O → quotes; reverse O2M `quote_items` on quotes).
+- `directus_users` (custom fields, **pending — add on the server**) — `user_type`
+  (string, dropdown: `contractor` / `homeowner`, nullable), `full_name` (string,
+  nullable), `company_name` (string, nullable). Set once at sign-up: homeowner →
+  `full_name` (their name); contractor → `company_name` + `full_name` (owner's
+  name). The frontend types these via `AppUserProfile` in `src/lib/directus.ts`
+  and writes them with `updateMe` after registration.
 
 ### Access policies (rebuilt on v11, 2026-07-13)
 
@@ -125,11 +131,17 @@ pm2 keeps it alive across reboots.
   `quote_items`; Read/Update on `quotes` scoped with a custom Item Permission filter
   **`user_created equals $CURRENT_USER`** — server-enforced row-level scoping.
   `quote_items` scoped via the relational path **`quote.user_created equals
-  $CURRENT_USER`** rather than its own `user_created` field. No `directus_users`
-  access (self-scoped Read/Update to be added when auth lands). **The `quotes`/
+  $CURRENT_USER`** rather than its own `user_created` field. **The `quotes`/
   `quote_items` Read permissions must grant the individual fields, not just the
   row filter** — the rebuild originally left the field list empty, which broke the
   app's list queries until fixed 2026-07-21 (see the schema note above).
+  **`directus_users` self-access (pending — add on the server for the sign-up
+  profile):** Read + Update on `directus_users`, item filter **`id equals
+  $CURRENT_USER`**, both **field-limited to `user_type`, `full_name`,
+  `company_name`** (plus `id` on Read). Field-limiting the Update is what stops a
+  user from editing anything else on their own record. Until this is added, the
+  `updateMe` call after sign-up 403s — handled as best-effort (the user still
+  signs in; the profile just isn't saved).
 - ✅ **Row-level filters now work at no cost** — they were paywalled on self-hosted
   Directus 12 (the reason for the downgrade); on v11 they are free. Frontend-side
   user scoping is no longer the enforcement mechanism.
