@@ -4,15 +4,17 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
+import { AppState } from 'react-native';
 
 import { registerUser } from '@directus/sdk';
 
 import { authStorage } from '@/lib/auth-storage';
 import { directus } from '@/lib/directus';
-import { queryClient } from '@/lib/query';
+import { queryClient, setSessionExpiredHandler } from '@/lib/query';
 
 // Session state for the whole app. The root layout renders the login gate off
 // `status`, so everything below it can assume a signed-in Directus client.
@@ -110,6 +112,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStatus('signedOut');
     }
   }, []);
+
+  // Bounce a dead session to the login gate. The query layer calls this when an
+  // authenticated data request fails with an auth error (revoked/expired token
+  // that autoRefresh couldn't save). Registered only while signedIn: during
+  // 'restoring' the restore effect owns refresh failures, and 'signedOut' has
+  // nowhere to go.
+  useEffect(() => {
+    if (status !== 'signedIn') return;
+    setSessionExpiredHandler(() => {
+      void signOut();
+    });
+    return () => setSessionExpiredHandler(null);
+  }, [status, signOut]);
+
+  // Re-validate the session whenever the app returns to the foreground. Access
+  // tokens are stateless JWTs that stay valid until they expire, so a session
+  // revoked server-side (password changed, account removed) keeps working until
+  // then; refreshing on foreground catches it promptly instead of waiting for
+  // the access token's TTL. Only a server rejection (dead refresh token) signs
+  // out — a network failure leaves the session in place to retry later. Runs
+  // only while signedIn.
+  const appStateRef = useRef(AppState.currentState);
+  useEffect(() => {
+    if (status !== 'signedIn') return;
+    const sub = AppState.addEventListener('change', (next) => {
+      const prev = appStateRef.current;
+      appStateRef.current = next;
+      // Only act on an actual return to the foreground (background/inactive →
+      // active), not on every transition.
+      if (next !== 'active' || prev === 'active') return;
+      directus.refresh().catch((error) => {
+        if (isServerRejection(error)) void signOut();
+      });
+    });
+    return () => sub.remove();
+  }, [status, signOut]);
 
   const value = useMemo(
     () => ({ status, signIn, signUp, signOut }),

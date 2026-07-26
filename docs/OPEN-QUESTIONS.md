@@ -28,9 +28,11 @@ decisions into the relevant task docs.
 4. **What does logged-out look like?** A login screen gate in front of the whole app,
    or browse-freely-but-login-to-save? (Gate is simpler and matches a company tool.)
 
-5. **How locked-down does Public get?** Plan: strip Public back to nothing (maybe
-   keep `room_types` read for pre-login flows if we allow any). Everything moves to
-   the App User role. Confirm nothing should stay public.
+5. **How locked-down does Public get?** ✅ **Resolved 2026-07-25.** Public keeps
+   **Read on `room_types` only**; everything else (labour_rates, quotes,
+   quote_items) is App-User-only. The v11 rebuild was already at this shape (the
+   v12 pre-auth widening was never carried over), and the maintainer confirmed
+   room_types stays public rather than being pulled behind the gate.
 
 6. **User scoping of quotes.** ✅ **Resolved 2026-07-13, verified 2026-07-21.**
    The requirement stands (with public sign-up, each account must only see its own

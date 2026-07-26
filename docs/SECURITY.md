@@ -137,10 +137,10 @@ The starting point, so we know what we're fixing:
 
 ### 2.2 API access control (Directus)
 
-- ✅/❓ **Public policy** — on the v11 rebuild it was already minimal: Read on
+- ✅ **Public policy** — on the v11 rebuild it was already minimal: Read on
   `room_types` only, no `quotes`/`quote_items` access (the v12 pre-auth widening
-  was never carried over). Open decision remaining: whether `room_types` read
-  stays public at all (OPEN-QUESTIONS #5).
+  was never carried over). Decision closed 2026-07-25 (OPEN-QUESTIONS #5):
+  `room_types` read **stays public**; everything else is App-User-only.
 - 🔜 **App User role** as the only path to data: read reference collections,
   CRU on quotes/items. No delete unless we decide quotes are deletable in-app.
 - ✅ **Server-side quote scoping** (required 2026-07-13, done same day): resolved

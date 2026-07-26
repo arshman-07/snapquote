@@ -128,9 +128,47 @@ which resolved OQ #1/#2 and reshaped this task:
       Authorization header, garbage persisted token doesn't break launch. Note:
       the SDK does NOT auto-refresh from a cold start (no `expires_at`) — the
       auth context must call `directus.refresh()` on launch.)
-- [ ] Auto-refresh on launch; 401 → back to login
-- [ ] Move all permissions to the App User role; strip Public back to nothing
-      (decide whether `room_types` read stays public — OQ #5)
+- [x] Auto-refresh on launch; 401 → back to login (2026-07-25). Launch/in-session
+      refresh was already in place — `AuthProvider.restore()` calls
+      `directus.refresh()` on cold start, and the SDK client runs `autoRefresh:
+      true` for proactive in-session renewal. This step added the missing
+      **mid-session dead-session → login** path (option A, immediate sign-out):
+      `src/lib/query.ts` now wires a global `QueryCache`/`MutationCache`
+      `onError` through `isAuthError` (Directus SDK v23 codes `TOKEN_EXPIRED` /
+      `INVALID_TOKEN` / `INVALID_CREDENTIALS`, or a raw 401) to a module-level
+      `setSessionExpiredHandler`; the auth context registers `signOut` on that
+      handler while `status === 'signedIn'` only (restore owns its own refresh
+      failures; signedOut has nowhere to go). Login/sign-up requests go through
+      `directus.request` directly, so their credential errors never trip it —
+      only authenticated data hooks do. Bounce is automatic via the existing
+      `status`-driven gate.
+      **Verification (2026-07-26):** the launch/relaunch logout path is confirmed
+      on-device — after the account was deleted server-side, quitting and
+      reopening the app lands on `/login` (`restore()` → `directus.refresh()` →
+      401 → token cleared → signedOut). The **mid-session** handler is verified by
+      SDK-source inspection (v23 throws `RequestError` with `.response.status` +
+      `.errors[].extensions.code`, exactly what `isAuthError` matches) but was not
+      reproducible on-device by revoking the session: Directus access tokens are
+      **stateless JWTs**, so neither a password change nor deleting the user
+      yields an immediate 401 — the token keeps authenticating until its
+      ~15-min TTL expires (deleting the user just made the scoped quotes query
+      return an empty 200, no error). A genuine mid-session 401 only occurs on
+      access-token expiry with a failed refresh; to exercise it deliberately,
+      temporarily lower `ACCESS_TOKEN_TTL` on the server. Left as verified-by-code
+      + realistic-path-untested.
+      **Foreground refresh (2026-07-26):** to catch a revoked session promptly
+      instead of waiting out the token TTL, the auth context also re-validates on
+      `AppState` → `active` (background/inactive → active): it calls
+      `directus.refresh()` and signs out on a server rejection (dead refresh
+      token); a network failure leaves the session in place. Runs only while
+      signedIn. This also makes the revoke test reproducible without touching the
+      server TTL: delete/suspend the account, then background and reopen the app →
+      lands on `/login`.
+- [x] Move all permissions to the App User role; strip Public back to nothing
+      (2026-07-25). Public keeps **Read on `room_types` only** (OQ #5 resolved —
+      stays public); labour_rates + quotes/quote_items are App-User-only. The v11
+      rebuild was already at this shape; the maintainer confirmed and finalized
+      it. See SECURITY.md §2.2 and BACKEND.md "Access policies".
 - [x] User scoping of quotes — server-side row-level filters
       (`user_created = $CURRENT_USER`) live on v11 since 2026-07-13. Verified via
       API 2026-07-21: a fresh App User reads only its own quotes. Wiring the app
@@ -160,7 +198,15 @@ which resolved OQ #1/#2 and reshaped this task:
       quote scoping verified by API; and the two v11 rebuild gaps that broke the
       recent-quotes list (empty field-read perms + missing `date_created`) found
       and fixed. The auth flow — sign-up, sign-in, gated app, scoped quotes — now
-      works end-to-end against v11. **Remaining for the task:** `user_type`
-      (contractor/homeowner) field + self-update permission and the sign-up
-      selector; strip/confirm the Public policy lockdown (OQ #5); decide email
-      verification (needs a mail transport); stop the emptied v12 service.
+      works end-to-end against v11. **2026-07-25:** the mid-session
+      401 → login path landed (see the auto-refresh checklist item); the
+      Public-policy lockdown is done and OQ #5 resolved (Public keeps
+      `room_types` read only). **2026-07-26:** launch/relaunch logout confirmed
+      on-device (deleted account → relaunch → `/login`); the mid-session 401
+      handler is verified-by-code but its realistic path (token-expiry + failed
+      refresh) is untested on-device because a stateless JWT can't be forced to
+      401 by server-side revocation — lower `ACCESS_TOKEN_TTL` to exercise it.
+      **Remaining for the task:** `user_type` (contractor/homeowner) field +
+      self-update permission and the sign-up selector; run the permission-probing
+      checklist (SECURITY.md §3.1, incl. cross-user); decide email verification
+      (needs a mail transport); stop the emptied v12 service.
