@@ -1,0 +1,13 @@
+{
+  "name": "directus-extension-quote-item-owner-guard",
+  "version": "1.0.0",
+  "description": "Rejects quote_items writes that point at a quote the caller doesn't own.",
+  "private": true,
+  "type": "module",
+  "directus:extension": {
+    "type": "hook",
+    "path": "index.js",
+    "source": "index.js",
+    "host": "^11.0.0"
+  }
+}
