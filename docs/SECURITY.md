@@ -30,6 +30,14 @@ Status legend: ✅ in place · 🔜 planned/agreed · ❓ needs discussion
 > on v11 precisely because the App User policy has **no `directus_users` access** —
 > the registration + All-Access-on-users combination that made it a hole on v12
 > does not exist here. Sign-up and sign-in verified on-device the same day.
+>
+> **Fourth update (2026-07-26): the App User policy now has _narrow_
+> `directus_users` access** — self-scoped (`id = $CURRENT_USER`) Read/Update
+> field-limited to `user_type` / `full_name` / `company_name`, for the sign-up
+> profile. That is deliberately not the v12 shape: the field limit is what keeps
+> registration safe. Probed the same day — `PATCH /users/me` on `role`, `email`
+> and `password` all 403, `GET /users` self-filters to the caller only, and B's
+> user record is unreachable from A.
 
 **Status: fixed on the live v11 instance (8056); v12 (8055) emptied of all data
 but still running with registration enabled — stop the container to close it
@@ -152,64 +160,163 @@ The starting point, so we know what we're fixing:
   User — reads only its own quotes. (The App User Read permission must also grant
   the individual fields, not just the row filter; the rebuild left that empty and
   broke the app's list queries until fixed 2026-07-21.)
-- ❌ **OPEN — `quote_items` create isn't owner-scoped (found 2026-07-26 by
-  `scripts/probe-permissions.sh`).** An authenticated App User can `POST
-  /items/quote_items` with `quote` set to **another user's** quote id and it
-  succeeds (200), attaching fabricated line items to a quote they don't own — an
-  integrity/tampering hole, though not a read leak (cross-user *reads* of quotes
-  and items are correctly denied). Root cause: Directus create-time Field
-  Validation / permission filters only see fields on the incoming payload and
-  **can't traverse the M2O** to `quote.user_created`, so a same-collection rule
-  can't express "the referenced quote must be mine." (A rule on the item's own
-  `user_created` wouldn't help anyway — the attacker's item legitimately has
-  *their* id; the check must be on the *quote's* owner. The `user_created` preset
-  possibly populating after validation is a secondary red herring.) **Fix
-  required before wider launch — options in §2.2a below.** Read-side scoping means
-  the victim would see the bogus items on their own quote.
-- ❓ **`GET /users` returns 200 for an App User (needs body confirmation).** The
-  list endpoint responds 200 rather than 403; this is expected Directus behaviour
-  *if* the self-scoped Read Item Permission (`id = $CURRENT_USER`) filters the
-  body to only the caller's own record. Confirm by inspecting the response body:
-  it must contain only the caller and no other users. (The probe script now
-  asserts B's id is absent from A's `/users` response.)
+- ✅ **`quote_items` create isn't owner-scoped in permissions — found and closed
+  2026-07-26.** An authenticated App User could `POST /items/quote_items` with
+  `quote` set to **another user's** quote id and it succeeded (200), attaching
+  fabricated line items to a quote they didn't own — an integrity/tampering hole,
+  though not a read leak (cross-user *reads* of quotes and items were correctly
+  denied throughout). Root cause:
+  Directus create-time Field Validation / permission filters only see fields on
+  the incoming payload and **can't traverse the M2O** to `quote.user_created`, so
+  a same-collection rule can't express "the referenced quote must be mine." (A
+  rule on the item's own `user_created` wouldn't help anyway — the attacker's item
+  legitimately has *their* id; the check must be on the *quote's* owner. The
+  `user_created` preset possibly populating after validation is a secondary red
+  herring.) Read-side scoping meant the victim would have seen the bogus items on
+  their own quote. **Closed by the `quote-item-owner-guard` hook extension
+  (§2.2a) — deployed to the devbox and verified 2026-07-26**: the cross-user
+  attach probe now returns 403, and the own-quote attach still returns 200.
+- ✅ **`GET /users` returns 200 for an App User and self-filters the body** —
+  confirmed 2026-07-26. The list endpoint responds 200 rather than 403, which is
+  expected Directus behaviour given the self-scoped Read Item Permission
+  (`id = $CURRENT_USER`); the probe asserts B's id is absent from A's `/users`
+  response, and it is. Status alone was never the meaningful check here.
 - ✅ **`quotes` update field coverage** — fixed 2026-07-26: `job_type` was missing
   from the `quotes` Update allowed Field Permissions, so users couldn't edit it on
   their own quotes; added.
+- ✅ **`quote_items` Read was scoped on the wrong field — found and fixed
+  2026-07-27.** It filtered on the item's own `user_created` rather than the
+  relational `quote.user_created` that BACKEND.md claimed. **Never a
+  confidentiality break** — no user could read another user's data — but the
+  inverse: items *planted on your quote by someone else* were invisible to you
+  and stayed visible to their creator (residue from the pre-guard window). Now
+  uses the relational path, matching the new Delete permission. Verified both
+  directions.
+  **The §3.1 probe suite passed 35/35 the whole time this was wrong** — it only
+  tested that cross-user *creation* was blocked, never cross-user *reading* of a
+  planted item. **Covered since 2026-07-27** by the Group C isolation probes.
+- ✅ **`quotes` Delete — granted 2026-07-27 and now deliberate.** It was added
+  unintentionally alongside `quote_items` Delete, but the decision was then made
+  to keep it and ship quote deletion in the app, so it is no longer a capability
+  without a UI. Owner-scoped and verified: A cannot delete B's quote.
+  This reverses the earlier "no delete unless quotes are deletable in-app"
+  position — quotes *are* now deletable in-app.
+  Two follow-on fixes were required:
+  - The §3.1 `DELETE own quote` probe expected 403 and so **failed while
+    silently deleting one of A's real quotes on every run**. It now expects 204
+    and runs against a quote created purely as a delete target.
+  - The app deletes line items explicitly before the quote rather than trusting
+    the DB to cascade — see BACKEND.md. Whether `quote_items.quote` is CASCADE or
+    SET NULL can't be read from the client, and under SET NULL the orphans would
+    be permanently invisible (the read filter scopes through `quote.user_created`)
+    and so unrecoverable from the app.
 - ❓ **Admin account hygiene** — strong unique password on the Directus admin,
   admin UI not exposed beyond LAN/Tailscale, static admin tokens avoided.
 
-#### 2.2a Compensating control for `quote_items` create scoping (planned)
+#### 2.2a Compensating control for `quote_items` create scoping
 
 The check must load the referenced quote and confirm its `user_created` matches
-the caller, which needs relation access at write time. Candidate approaches:
+the caller, which needs relation access at write time — impossible in the
+permissions UI, so it has to be code.
 
-- **Directus Flow — Filter (blocking) on `quote_items.items.create`.** No-code,
-  lives in the admin. Reads the referenced quote(s), compares `user_created` to
-  the trigger's accountability user, and rejects otherwise. Must handle the
-  **batch** payload the app sends (`createItems`) and the array shape, and needs a
-  Read-Data step (the sandboxed Run-Script op has no DB access).
-- **Custom hook extension — `filter('quote_items.items.create', …)`.** Uses the
-  `ItemsService` to load the quote and throw a `ForbiddenError` on mismatch.
-  Robust, handles batch cleanly, but is a code extension to build and deploy into
-  the Directus container.
-- **Nested-only creation.** Stop the app creating items via a standalone
-  `POST /items/quote_items` and instead nest them under the quote create/update
-  (O2M), so the quote's own owner-scope governs. Reduces the standalone attack
-  surface but Directus still checks `quote_items` create permission on nested
-  items, so it's a defence-in-depth measure, not a complete fix on its own —
-  pair it with one of the above. This one also touches the frontend
-  (`useSaveQuote`).
+**Decided, built, deployed and verified 2026-07-26: a custom hook extension**,
+`directus/extensions/quote-item-owner-guard` — living on the devbox at
+`~/directus/extensions/` and mounted into the `directus11` container via
+`docker-compose.yml`; load confirmed in the container logs. See
+`directus/README.md` for the deploy and verification steps.
+It registers `filter('quote_items.items.create', …)` and the matching `…update`
+event, and loads the referenced quote through `ItemsService` **using the caller's
+own accountability** — so the existing, already-correct read scoping on `quotes`
+remains the single definition of ownership, and the guard can't drift out of sync
+with the permissions UI. If the caller can't read the quote, ItemsService throws
+Directus's own `ForbiddenError` and the write is rejected 403. Notes:
+
+- Guards **update** as well as create: App Users have no `quote_items` Update
+  permission today, but re-parenting an item (`PATCH { quote: <foreign id> }`)
+  would be the same hole the day that permission is granted.
+- Also refuses a create with **no** `quote` — an orphan item is unusable and
+  would be re-parentable later.
+- Batch-safe (Directus fires the filter per item for `createItems`; the handler
+  normalises an array payload anyway) and **fails closed** — every failure mode,
+  including the extension not loading, results in a blocked or errored write
+  rather than a silent pass. Confirm the load in the Directus logs regardless.
+- Dependency-free hand-written ESM, so there is no build step or `npm install` on
+  the server and the file in git is the file that runs.
+
+Rejected alternatives:
+
+- **Directus Flow — Filter (blocking) on `quote_items.items.create`.** No-code
+  and admin-managed, but it lives in the Directus database: not in git, not
+  reviewable, and lost on a rebuild (this schema has already been rebuilt by hand
+  once). Also needs a separate Read-Data step (the sandboxed Run-Script op has no
+  DB access) and fiddly handling of the batch payload.
+- **Nested-only creation.** Nest items under the quote create/update (O2M) so the
+  quote's own owner-scope governs. Directus still checks `quote_items` create
+  permission on nested items and the standalone `POST /items/quote_items` endpoint
+  stays open, so it's defence in depth, not a fix. Also touches the frontend
+  (`useSaveQuote`). Still available later as a hardening step.
+- **Server-side save endpoint** — revoke `quote_items` Create from App Users
+  entirely and create quote + items in one custom endpoint. Closes the hole by
+  construction but is a much bigger build; revisit if Phase 3's AI estimation
+  work brings a custom endpoint anyway.
 
 ### 2.3 Authentication & session handling (Phase 2 §7)
 
-- 🔜 **Directus email/password login** for the App User role; account model and
-  provisioning per OPEN-QUESTIONS #1–2.
-- 🔜 **Token storage:** refresh token in `expo-secure-store` (Keychain/Keystore),
+- ✅ **Directus email/password login** for the App User role, with in-app
+  sign-up (OPEN-QUESTIONS #1–2 resolved). Built and verified on-device 2026-07-21.
+- ✅ **Token storage:** refresh token in `expo-secure-store` (Keychain/Keystore),
   access token in memory only. Never AsyncStorage, never logged.
-- 🔜 **Auto-refresh on launch**; failed refresh → back to the login gate.
+  (`src/lib/auth-storage.ts`; web falls back to localStorage — dev target only.)
+- ✅ **Auto-refresh on launch**; failed refresh → back to the login gate.
+  Confirmed on-device 2026-07-26 (deleted account → relaunch → `/login`).
+- ✅ **Mid-session dead session → login.** Verified on-device **2026-07-27**:
+  with `ACCESS_TOKEN_TTL=60s` and the user's `directus_sessions` row deleted, a
+  foregrounded pull-to-refresh bounced to `/login`. Note the bounce is
+  **reactive** — the SDK swallows the failed refresh and re-sends the expired
+  access token, so it takes an actual request to surface the 401. A user idling
+  with no query activity keeps a dead session on screen until something fetches.
+  Full mechanism and recipe in `docs/tasks/auth.md`.
+- ✅ **An admin password change DOES invalidate existing sessions** — opened and
+  closed 2026-07-27. Directus 11.13.4 deletes the user's `directus_sessions` rows
+  on a password change, so no compensating control is needed.
+  **Evidence:** a refresh token captured before the change returned **401
+  `INVALID_CREDENTIALS`** afterwards, against a same-session **200** baseline
+  taken minutes earlier on the unchanged password (the baseline used a second,
+  independent session, since `/auth/refresh` rotates the token it consumes).
+  The earlier "changed the password, app didn't redirect" observation was a
+  **measurement artefact, not a finding**: it ran at the default 15-minute
+  `ACCESS_TOKEN_TTL`, so the still-valid stateless access token kept every
+  request succeeding and the app never had cause to touch its refresh token. The
+  session had in fact been dead the whole time. The app would have bounced at the
+  next access-token expiry, or immediately on the next foreground re-validation.
+  Both client paths handle the resulting error: `INVALID_CREDENTIALS` is in
+  `isAuthError` (`src/lib/query.ts`) and counts as a server rejection for the
+  `AppState` re-validation in `src/context/auth.tsx`.
+  **Consequence:** the `users.update` hook sketched here previously is
+  unnecessary — dropped. Re-verify if Directus is ever upgraded. The test, for
+  reuse (it bypasses the app and the TTL entirely):
+
+  ```bash
+  RT=$(curl -s -X POST -H 'Content-Type: application/json' \
+    -d '{"email":"userA@example.com","password":"…"}' \
+    http://100.64.144.41:8056/auth/login | jq -r .data.refresh_token)
+  # …now change that user's password in Data Studio, then:
+  curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+    -H 'Content-Type: application/json' \
+    -d "{\"refresh_token\":\"$RT\",\"mode\":\"json\"}" \
+    http://100.64.144.41:8056/auth/refresh
+  ```
+
+  **401 (what we got)** → sessions are invalidated; nothing to build. **200**
+  would have meant sessions survive a password change — a real gap, since the
+  standard reason to change a password is to evict someone who has your account.
+  Note the app still ships **no** password-change or forgot-password UI (no
+  `passwordRequest`/`passwordReset` anywhere in `src/`), so this currently only
+  applies to admin-initiated changes in Data Studio. The server-side half of a
+  future password-reset flow is now known to be sound.
 - ❓ **Session lifetime** — indefinite (refresh forever) vs. forced re-login after
   N days. OPEN-QUESTIONS #3 proposes indefinite on a personal phone.
-- ❓ **Logout** — required for v1? (Clears secure store + query cache.)
+- ✅ **Logout** — shipped 2026-07-13 (clears secure store + query cache).
 
 ### 2.4 Secrets & configuration
 
@@ -263,21 +370,62 @@ BASE_URL=http://100.64.144.41:8056 \
   bash scripts/probe-permissions.sh
 ```
 
-Set `RUN_PROFILE_PROBES=true` once the `directus_users` profile fields + App User
-self Read/Update permissions exist, so the run also verifies those. The script
-carries no credentials (env-var driven; placeholder defaults only).
+Set `RUN_PROFILE_PROBES=true` (the `directus_users` profile fields + App User self
+Read/Update permissions now exist, so this should stay on). The script carries no
+credentials (env-var driven; placeholder defaults only).
 
-Run against the live API after each permissions change:
+**✅ Full run 2026-07-26 with profile probes on: 35 passed, 0 failed, 0 skipped.**
+**✅ Re-run 2026-07-27** after the `quotes.customer_name` field + its Read/Create/
+Update field permissions landed: **35 passed, 0 failed, 0 skipped** — unchanged.
+Re-run after every permissions change.
 
-- [ ] Unauthenticated request to every collection — confirm only the intended
-      public surface responds (after lockdown: expect 401/403 on quotes).
-- [ ] Unauthenticated create on `quotes`/`quote_items` — expect rejection.
-- [ ] Authenticated App User: confirm CRU works on own data, and that
-      privileged operations (delete, other collections, user admin) are denied.
-- [ ] Expired/garbage token — expect 401, and the app returns to login rather
-      than crashing or silently showing stale data.
+**✅ Re-run 2026-07-27 after quote editing + deletion landed, with two new
+groups closing the suite's known blind spots: 55 passed, 0 failed, 0 skipped.**
+
+Both gaps had let a real defect sit at a green 35/35:
+
+- **Per-field permissions (Group F).** The suite only probed *operations* with a
+  fixed payload, so a field missing from an allow-list passed here while breaking
+  the app — `job_type` (2026-07-26) and `customer_name` (2026-07-27) both did
+  exactly that. Now: two Read probes using the app's real field sets
+  (`useRecentQuotes`, `useQuote`), plus one Update probe per field the wizard
+  writes. Keep the field list in step with `buildQuotePayload()`.
+- **Cross-user item read (Group C isolation).** Every earlier probe only checked
+  that cross-user *creation* was blocked, never cross-user *reading* — which is
+  how the `quote_items` scoping bug survived. Now B plants an item on B's own
+  quote and the suite asserts A can't see it by id or in a list, *and* that B
+  can (the inverse half of the same bug).
+
+**Detection was negative-tested**, not just assumed green: reading and patching a
+deliberately unpermitted field both return 403, so Group F genuinely fails when a
+permission is missing.
+
+**The suite is now non-destructive and self-cleaning.** It previously deleted a
+real quote on every run (the `DELETE own quote` probe pointed at an existing
+quote) and accumulated a quote plus a line item each time. Both probe targets are
+now purpose-created and removed in a cleanup step; a full run is net zero rows.
+
+- [x] Unauthenticated request to every collection — confirm only the intended
+      public surface responds. Verified: `room_types` only; quotes/quote_items/
+      labour_rates/users all denied, unauthenticated creates rejected.
+- [x] Unauthenticated create on `quotes`/`quote_items` — expect rejection.
+- [x] Authenticated App User: CRU works on own data (incl. the own-quote
+      `quote_items` attach path end-to-end), and privileged operations are
+      denied — delete, other users' records, `/roles` `/policies` `/permissions`,
+      and self-escalation via `PATCH /users/me` (role/email/password).
+- [x] Cross-user: every tested path denied — quote read/update/delete, attaching
+      `quote_items` to another user's quote, and reading/patching their user
+      record. List isolation asserted on response *content*, not just status.
+- [x] Garbage token — 401. (The **app-side** half of this — returning to login
+      rather than showing stale data — is tracked in §3.3 / `tasks/auth.md`, and
+      is the one piece still not exercised on a realistic path.)
+- [x] Profile self-service (Group E) — `GET /users/me` and `PATCH /users/me` on
+      `full_name` / `user_type` succeed without opening any escalation path.
+      `company_name` is granted by the same field-limited permission but is not
+      individually probed.
 - [ ] Oversized / out-of-range / wrong-type payloads direct to the API — verify
-      server-side validation once added (§2.5).
+      server-side validation once added (§2.5). **The remaining gap in §3.1:**
+      the matrix covers *who* can touch *what*, not *what values* they can write.
 
 ### 3.2 Secret & dependency hygiene (automatable now)
 

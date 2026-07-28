@@ -8,26 +8,44 @@ scope quotes to the signed-in account. The last remaining Phase 2 section.
 Related: `docs/OPEN-QUESTIONS.md` (Phase 2 §7, questions 1–7) and
 `docs/SECURITY.md` (§2.2 API lockdown, §2.3 sessions — both blocked on this task).
 
-## ⚠️ NEXT SESSION — DO FIRST (from the 2026-07-26 permission probing)
+## ✅ Server-side lockdown closed out (2026-07-26)
 
-Ordered by priority; tackle before any new feature work:
+All three do-first items from the 2026-07-26 probing run are done, and the full
+matrix passes — **35 passed, 0 failed, 0 skipped** with `RUN_PROFILE_PROBES=true`:
 
-1. **❌ SECURITY: close the `quote_items` create gap.** Any App User can attach
-   fabricated line items to another user's quote (`POST /items/quote_items` with
-   someone else's `quote` id → 200). Create-time Directus rules can't traverse
-   `quote.user_created`, so this needs a compensating control — a Directus Flow
-   or a filter-hook extension that rejects when the referenced quote isn't the
-   caller's. Options + tradeoffs in `SECURITY.md` §2.2a; **approach not yet
-   chosen** (Flow vs hook extension). Re-run `scripts/probe-permissions.sh` after
-   — the "POST item onto B's quote" probe must flip to PASS.
-2. **Confirm `GET /users` self-filters the body.** It returns 200 for an App User
-   (not 403); verify the response contains only the caller's own record. The
-   probe script now asserts B's id is absent from A's `/users` response — just
-   run it and confirm that row is PASS.
-3. **Backend for the sign-up profile (`user_type`).** Add the `directus_users`
-   fields + App User self Read/Update (field-limited) per `BACKEND.md`, then set
-   `RUN_PROFILE_PROBES=true` and re-run the probe script; verify a new sign-up
-   persists `user_type`/`full_name`/`company_name`.
+1. **`quote_items` ownership gap — closed.** Enforced by the
+   `quote-item-owner-guard` hook extension (`directus/extensions/`, deployed to
+   `~/directus/extensions/` on the devbox and mounted into the `directus11`
+   container; load confirmed in the logs). It loads the referenced quote as the
+   caller so the existing read scoping decides ownership, and guards
+   `…items.update` too so re-parenting can't reopen it. Cross-user attach now
+   403s; the own-quote attach path still works end-to-end. Decision + rejected
+   alternatives in `SECURITY.md` §2.2a.
+2. **`GET /users` self-filtering — confirmed.** 200 with a body containing only
+   the caller; B's id absent from A's response.
+3. **Sign-up profile backend — added.** `directus_users` gets `user_type` /
+   `full_name` / `company_name` with self-scoped, field-limited Read + Update, so
+   the post-sign-up `updateMe` persists instead of 403ing. Escalation via
+   `PATCH /users/me` (role/email/password) stays 403.
+
+**What's left on this task** (none of it blocks the app):
+
+- ~~The **mid-session 401 → login** path is verified-by-code only.~~ **Closed
+  2026-07-27 — verified on-device on the realistic path.** See the auto-refresh
+  checklist item below.
+- ~~Does an admin password change invalidate existing sessions?~~ **Opened and
+  closed 2026-07-27: yes, it does.** A refresh token held across a Data Studio
+  password change returned 401 `INVALID_CREDENTIALS` (vs a 200 baseline on an
+  unchanged password). The earlier "password change didn't redirect" observation
+  was an artefact of the default 15-minute `ACCESS_TOKEN_TTL`, not a surviving
+  session. No compensating control needed — see `SECURITY.md` §2.3.
+- Offline fallbacks behind the auth gate are untested (OQ #7).
+- Email verification at sign-up is still an open question (needs a mail
+  transport on the server).
+- The emptied **v12 instance (8055) is still running** with registration enabled
+  — stop the container to close out `SECURITY.md` §0.
+- Payload/value validation (`SECURITY.md` §2.5) is the one unticked row in the
+  §3.1 matrix: it covers *who* can touch *what*, not *what values* they write.
 
 ## Implementation options (surveyed 2026-07-03)
 
@@ -192,8 +210,33 @@ which resolved OQ #1/#2 and reshaped this task:
       ~15-min TTL expires (deleting the user just made the scoped quotes query
       return an empty 200, no error). A genuine mid-session 401 only occurs on
       access-token expiry with a failed refresh; to exercise it deliberately,
-      temporarily lower `ACCESS_TOKEN_TTL` on the server. Left as verified-by-code
-      + realistic-path-untested.
+      temporarily lower `ACCESS_TOKEN_TTL` on the server.
+      **✅ Verified on-device 2026-07-27 — PASS.** Recipe: `ACCESS_TOKEN_TTL=60s`
+      on `directus11` (via `docker compose up -d`, not `restart` — `restart` does
+      not re-read env), sign in on-device, delete the user's row from
+      `directus_sessions` in Postgres (kills the refresh token but leaves the
+      account intact), keep the app **foregrounded** ~70s, then pull-to-refresh
+      the Home recent-quotes list → bounced to `/login`. TTL has since been
+      restored to the default and the override line removed from
+      `docker-compose.yml`.
+      • Foregrounding matters: the `AppState` re-validation below fires on
+        `inactive → active`, not just `background → active`, so on iOS even the
+        notification shade or app switcher would sign you out via the *other*
+        path and invalidate the test. `src/lib/query.ts` logs
+        `[auth] session expired mid-session → signing out` under `__DEV__` so the
+        two paths are distinguishable.
+      • **Mechanism — corrected 2026-07-27.** The 401 does *not* come from the
+        failed refresh propagating. Per `@directus/sdk@23.0.0`
+        (`dist/auth/composable.js`): `getToken()` is
+        `await refreshIfExpired().catch(() => {})`, so a refresh rejection is
+        swallowed outright, and `refresh()` only rewrites storage *after* a
+        successful `POST /auth/refresh` — on failure the **expired access token
+        stays in storage**. `rest()` then sends it anyway, and Directus answers
+        401 `TOKEN_EXPIRED`. `isAuthError` matches on both the raw 401 status and
+        the code, so it catches this either way. Practical consequence: the
+        bounce is **reactive** — it needs the app to actually issue a request, so
+        a user idling on a screen with no query activity stays put until
+        something fetches.
       **Foreground refresh (2026-07-26):** to catch a revoked session promptly
       instead of waiting out the token TTL, the auth context also re-validates on
       `AppState` → `active` (background/inactive → active): it calls
@@ -215,8 +258,10 @@ which resolved OQ #1/#2 and reshaped this task:
       `date_created` column) that broke the recent-quotes list; both fixed
       2026-07-21 — see `directus-11-downgrade.md` and BACKEND.md.
 - [ ] Verify offline fallbacks still work behind the gate (OQ #7)
-- [~] Run the permission-probing checklist (SECURITY.md §3.1) after lockdown,
+- [x] Run the permission-probing checklist (SECURITY.md §3.1) after lockdown,
       including cross-user probing (user A must not read user B's quotes).
+      **Closed 2026-07-26: full run with `RUN_PROFILE_PROBES=true` — 35 passed,
+      0 failed, 0 skipped.**
       **Runner built 2026-07-26:** `scripts/probe-permissions.sh` automates the
       Group A–D matrix (unauthenticated surface, own-data CRU, cross-user +
       privilege denials incl. escalation via `PATCH /users/me`, garbage token)
@@ -230,12 +275,17 @@ which resolved OQ #1/#2 and reshaped this task:
       blocked, garbage token rejected, and quote-list isolation confirmed (B's
       quote absent from A's list). Two items surfaced:
       • **Fixed:** `quotes` Update was missing `job_type` in its field permissions.
-      • **❌ OPEN — `quote_items` create isn't owner-scoped:** an App User can POST
-        a `quote_item` onto another user's quote (200, expected 403/404).
-        Directus create rules can't traverse `quote.user_created`. Compensating
-        control needed (Directus Flow / hook extension) — see SECURITY.md §2.2a.
-      • **Confirm:** `GET /users` returns 200 (self-filtered) not 403 — verify the
-        body contains only the caller (probe now asserts this).
+      • **✅ `quote_items` create isn't owner-scoped — closed same day:** an App
+        User could POST a `quote_item` onto another user's quote (200, expected
+        403/404) because Directus create rules can't traverse
+        `quote.user_created`. Fixed by the `quote-item-owner-guard` hook
+        extension (SECURITY.md §2.2a, `directus/README.md`), deployed and
+        re-probed. The probe gained two rows for it: a "no quote" deny and a
+        "POST item onto own quote" 200 regression check — both PASS.
+      • **✅ Confirmed:** `GET /users` returns 200 (self-filtered) not 403, and
+        the body contains only the caller (probe asserts B's id is absent).
+      **Re-run 2026-07-26 after the fixes, with `RUN_PROFILE_PROBES=true` once the
+      `directus_users` profile fields landed: 35 passed, 0 failed, 0 skipped.**
 
 ## Open questions
 
@@ -263,7 +313,13 @@ which resolved OQ #1/#2 and reshaped this task:
       handler is verified-by-code but its realistic path (token-expiry + failed
       refresh) is untested on-device because a stateless JWT can't be forced to
       401 by server-side revocation — lower `ACCESS_TOKEN_TTL` to exercise it.
-      **Remaining for the task:** `user_type` (contractor/homeowner) field +
-      self-update permission and the sign-up selector; run the permission-probing
-      checklist (SECURITY.md §3.1, incl. cross-user); decide email verification
-      (needs a mail transport); stop the emptied v12 service.
+      **2026-07-27:** that last gap is closed — the mid-session 401 → login
+      bounce is **verified on-device (PASS)** at `ACCESS_TOKEN_TTL=60s` with the
+      session row deleted from `directus_sessions`; TTL restored afterwards. The
+      SDK mechanism behind it was corrected in the checklist item above (stale
+      expired token re-sent → 401, not a propagated refresh error).
+      **Remaining for the task:** decide email verification (needs a mail
+      transport); stop the emptied v12 service; verify offline fallbacks behind
+      the gate (OQ #7); and payload/value validation (SECURITY.md §2.5). Session
+      invalidation on password change was checked the same day and needs no work
+      (SECURITY.md §2.3).

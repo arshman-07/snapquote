@@ -67,5 +67,21 @@ Two audiences, one flow, tailored by a **contractor / homeowner choice at sign-u
 - [x] Project vision & stack decided
 - [x] Documentation structure created
 - [x] Phase 1: frontend placeholder shell — all five flow screens built (Dimensions, Photo, Materials, Labour, Summary), walking end-to-end (2026-06-29)
-- [~] Phase 2: Directus integration — backend live (Directus **11.13.4** + Postgres via Docker Compose; 4 collections — downgraded from 12 on 2026-07-13 for free row-level permissions, see [directus-11-downgrade.md](./directus-11-downgrade.md)). Done: SDK + TanStack Query foundation; Dimensions wired to `room_types` + RHF/zod validation; Labour wired to `labour_rates`; quotes + line items persist on finish; Home lists real recent quotes (2026-07-02); server-enforced `$CURRENT_USER` quote scoping on v11 (2026-07-13). **Auth end-to-end (2026-07-21):** email/password login + **sign-up** ([tasks/auth.md](./tasks/auth.md)), public registration enabled on v11, and the recent-quotes list fixed after two v11-rebuild gaps (empty field-read perms + missing `date_created`) were found and closed. Remaining: `user_type` (contractor/homeowner) field + sign-up selector; Public-policy lockdown (OQ #5); stop the (emptied) v12 service. `labour_rates` seeded and frontend on v11 `:8056` (2026-07-13)
+- [~] Phase 2: Directus integration — **feature-complete, pending on-device verification.**
+  Backend live (Directus **11.13.4** + Postgres via Docker Compose; downgraded from 12 on
+  2026-07-13 for free row-level permissions, see
+  [directus-11-downgrade.md](./directus-11-downgrade.md)).
+  All five wizard steps wired; quotes + line items persist; both quote lists read live data
+  with server-enforced `$CURRENT_USER` scoping. **Auth end-to-end** (login, sign-up with
+  contractor/homeowner profile, gate, logout, session-expiry redirect —
+  [tasks/auth.md](./tasks/auth.md)). **Quotes are nameable, editable and deletable**
+  (2026-07-27). Permission suite green at 55/55 with per-field and cross-user item-read
+  coverage ([SECURITY.md](./SECURITY.md) §3.1).
+  **Remaining before Phase 2 closes:** stop the emptied v12 service on `:8055` (still
+  accepting registrations — oldest open item); decide email verification; server-side
+  payload validation (§2.5); offline fallbacks behind the gate (OQ #7); and **run the
+  2026-07-27 UI work on a device — none of it has been** (see FRONTEND.md “Verification
+  state”).
+- [ ] Deferred: **branding pass** — app icon, splash, favicon, tab icon and `app.json`
+  `slug`/`scheme` are all still Expo starter defaults
 - [ ] Phase 3: AI estimation

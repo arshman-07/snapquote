@@ -20,13 +20,16 @@ decisions into the relevant task docs.
    homeowners) via Directus public user registration into the App User role.
    No admin provisioning.
 
-3. **Session lifetime & storage.** Directus issues access + refresh tokens. Proposal:
-   store the refresh token in `expo-secure-store` and auto-refresh on launch, so the
-   user logs in once and stays logged in. Any objection to indefinite sessions on a
-   personal phone?
+3. **Session lifetime & storage.** ✅ **Resolved by implementation, 2026-07-13 →
+   2026-07-27.** Refresh token in `expo-secure-store` (localStorage on web), access
+   token in memory only; auto-refresh on launch and proactively in-session; sessions
+   are indefinite. A dead session bounces to login three ways: failed launch refresh,
+   failed foreground re-validation, and a 401 on any authenticated request. The
+   mid-session path was verified on-device 2026-07-27 (`SECURITY.md` §2.3).
 
-4. **What does logged-out look like?** A login screen gate in front of the whole app,
-   or browse-freely-but-login-to-save? (Gate is simpler and matches a company tool.)
+4. **What does logged-out look like?** ✅ **Resolved 2026-07-13: a full gate.** The
+   root layout gates `(tabs)`/`(quote)` behind a session via `Stack.Protected`; there
+   is no browse-freely mode. Simpler, and it matches the per-user data model.
 
 5. **How locked-down does Public get?** ✅ **Resolved 2026-07-25.** Public keeps
    **Read on `room_types` only**; everything else (labour_rates, quotes,
