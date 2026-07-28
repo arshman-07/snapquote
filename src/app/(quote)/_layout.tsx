@@ -1,19 +1,81 @@
-import { Stack } from 'expo-router';
-import React from 'react';
+import { Stack, useGlobalSearchParams } from 'expo-router';
+import React, { useEffect, useRef } from 'react';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 
-import { QuoteDraftProvider } from '@/context/quote-draft';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { Spacing } from '@/constants/theme';
+import { QuoteDraftProvider, useQuoteDraft } from '@/context/quote-draft';
+import { useQuote } from '@/hooks/use-quote';
+import { draftFromQuote } from '@/lib/quote-payload';
 
 // The multi-step quote wizard. Wrapping the inner Stack in QuoteDraftProvider
 // gives every step a shared draft to read from and write to, so data
 // accumulates across screens (dimensions → photo → materials → labour →
 // summary) without threading params or pulling in a global store.
 //
+// Entered two ways:
+//   /new-quote          — a blank draft (create)
+//   /new-quote?id=123   — hydrated from a saved quote (edit)
+//
 // Screens are auto-registered from the route files in this folder; we only set
 // shared options here. Each screen draws its own header, so headers are off.
 export default function QuoteLayout() {
   return (
     <QuoteDraftProvider>
-      <Stack screenOptions={{ headerShown: false }} />
+      <QuoteFlow />
     </QuoteDraftProvider>
   );
 }
+
+// Lives inside the provider so it can seed the draft. Holds the flow behind a
+// spinner until an edited quote is loaded — rendering the steps first would
+// briefly show an empty form and let the user start typing into a draft that's
+// about to be replaced.
+function QuoteFlow() {
+  const params = useGlobalSearchParams<{ id?: string }>();
+  const { editingId, hydrate } = useQuoteDraft();
+
+  // Latch the id from the entry URL. Later steps (/photo, /materials, …) carry
+  // no params, so reading it live would lose it the moment the user advances.
+  const editIdRef = useRef<number | null>(null);
+  if (editIdRef.current === null && params.id) {
+    const parsed = Number(params.id);
+    if (Number.isFinite(parsed)) editIdRef.current = parsed;
+  }
+  const editId = editIdRef.current;
+
+  const quoteQuery = useQuote(editId);
+
+  useEffect(() => {
+    const quote = quoteQuery.data;
+    if (quote && editingId !== quote.id) hydrate(draftFromQuote(quote), quote.id);
+  }, [quoteQuery.data, editingId, hydrate]);
+
+  const awaitingHydration = editId !== null && editingId !== editId;
+
+  if (awaitingHydration) {
+    return (
+      <ThemedView style={styles.centre}>
+        {quoteQuery.isError ? (
+          <ThemedText type="caption">
+            Couldn&apos;t open that quote — close and try again.
+          </ThemedText>
+        ) : (
+          <ActivityIndicator />
+        )}
+      </ThemedView>
+    );
+  }
+
+  return <Stack screenOptions={{ headerShown: false }} />;
+}
+
+const styles = StyleSheet.create({
+  centre: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.four,
+  },
+});

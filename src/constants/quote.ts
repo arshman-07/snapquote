@@ -32,8 +32,20 @@ export const QUOTE_STEP_COUNT = QUOTE_STEPS.length;
 // figure regardless.
 export const LABOUR_RATE_PRESETS = [300, 450, 600] as const;
 
-// Currency helper so every screen formats money the same way. USD — the app
+// Currency helpers so every screen formats money the same way. USD — the app
 // launches in the US.
+//
+// Two variants on purpose. `formatAmount` is the default for anything inside a
+// list or breakdown: the currency is stated once in that section's header, so
+// repeating "$" on every line is noise that also breaks digit alignment.
+// `formatMoney` (with the symbol) is for standalone figures that appear without
+// that surrounding context. Both are always rendered with `tabular`.
+export const CURRENCY_CODE = 'USD';
+
+export function formatAmount(amount: number): string {
+  return amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
 export function formatMoney(amount: number): string {
-  return `$${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  return `$${formatAmount(amount)}`;
 }

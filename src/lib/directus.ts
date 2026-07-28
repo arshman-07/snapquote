@@ -25,6 +25,10 @@ export type LabourRate = {
 // as raw strings while editing, then parses on save).
 export type Quote = {
   id: number;
+  // What the user calls this quote — usually the customer or the address.
+  // Optional and free-text; the UI falls back to `job_type` when it's unset.
+  // Deliberately separate from `job_type`, which stays a room-type reference.
+  customer_name: string | null;
   job_type: string | null;
   length: number | null;
   width: number | null;
@@ -34,6 +38,10 @@ export type Quote = {
   material_zip: string | null;
   selected_tier: 'budget' | 'standard' | 'premium' | null;
   materials_total: number | null;
+  // The inputs behind labour_total, kept so the wizard's Labour step can be
+  // rehydrated when a saved quote is reopened for editing.
+  labour_days: number | null;
+  labour_day_rate: number | null;
   labour_total: number | null;
   grand_total: number | null;
   status: string;

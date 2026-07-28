@@ -12,7 +12,8 @@ import { Pressable, View, StyleSheet } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-import { Accent, MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export default function AppTabs() {
   return (
@@ -32,31 +33,34 @@ export default function AppTabs() {
   );
 }
 
+// Selection is carried by weight and colour rather than a filled pill — a row
+// of rounded chips inside a rounded bar is exactly the card-in-card stacking
+// the design rules call out.
 export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps) {
   return (
     <Pressable {...props} style={({ pressed }) => pressed && styles.pressed}>
-      <ThemedView
-        type={isFocused ? 'backgroundSelected' : 'backgroundElement'}
-        style={styles.tabButtonView}>
-        <ThemedText type="small" themeColor={isFocused ? 'text' : 'textSecondary'}>
+      <View style={styles.tabButtonView}>
+        <ThemedText type={isFocused ? 'bodyBold' : 'body'} themeColor={isFocused ? 'ink' : 'muted'}>
           {children}
         </ThemedText>
-      </ThemedView>
+      </View>
     </Pressable>
   );
 }
 
 export function CustomTabList(props: TabListProps) {
+  const theme = useTheme();
+
   return (
-    <View {...props} style={styles.tabListContainer}>
-      <ThemedView type="backgroundElement" style={styles.innerContainer}>
-        <ThemedText type="smallBold" style={[styles.brandText, { color: Accent }]}>
+    <ThemedView {...props} style={[styles.tabListContainer, { borderBottomColor: theme.hairline }]}>
+      <View style={styles.innerContainer}>
+        <ThemedText type="bodyBold" style={styles.brandText}>
           SnapQuote
         </ThemedText>
 
         {props.children}
-      </ThemedView>
-    </View>
+      </View>
+    </ThemedView>
   );
 }
 
@@ -64,30 +68,27 @@ const styles = StyleSheet.create({
   tabListContainer: {
     position: 'absolute',
     width: '100%',
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.four,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   innerContainer: {
     paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.five,
-    borderRadius: Spacing.five,
     flexDirection: 'row',
     alignItems: 'center',
     flexGrow: 1,
-    gap: Spacing.two,
+    gap: Spacing.four,
     maxWidth: MaxContentWidth,
   },
   brandText: {
     marginRight: 'auto',
   },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.6,
   },
   tabButtonView: {
     paddingVertical: Spacing.one,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.three,
   },
 });

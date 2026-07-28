@@ -1,50 +1,70 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { formatMoney } from '@/constants/quote';
-import { Accent, Spacing } from '@/constants/theme';
+import { formatAmount } from '@/constants/quote';
+import { Spacing } from '@/constants/theme';
 import { type RecentQuote } from '@/hooks/use-recent-quotes';
-import { useTheme } from '@/hooks/use-theme';
+
+// The quote's display name: whatever the user called it, else the room type,
+// else a neutral fallback for rows saved without either. Exported so the rename
+// dialog can title itself with the same string the list shows.
+export function quoteLabel(quote: RecentQuote): string {
+  return quote.customer_name?.trim() || quote.job_type || 'Quote';
+}
 
 // One saved-quote row, shared by the Home tab (5 newest) and the Quotes tab
-// (all of them): job type + area/date on the left, total on the right, with a
-// "Draft" tag on anything not marked final. Rows can be sparse (null dims /
-// totals), so every fragment degrades gracefully. A hairline top border
-// separates rows (skipped on the first).
-export function QuoteRow({ quote, first }: { quote: RecentQuote; first: boolean }) {
-  const theme = useTheme();
+// (all of them): name on the left over its metadata, total on the right. Rows
+// can be sparse (null dims / totals / name), so every fragment degrades
+// gracefully.
+//
+// Deliberately fully neutral — no accent, no badge fill. A list is the one place
+// where "one accent element per screen" would be violated N times over, and a
+// column of orange totals reads as noise rather than emphasis. Separation
+// between rows is the caller's job (interleave <Divider />), so the row itself
+// stays composable.
+export function QuoteRow({ quote, onPress }: { quote: RecentQuote; onPress?: () => void }) {
   // Area is derived, and only shown when both dimensions were saved.
   const area = quote.length !== null && quote.width !== null ? quote.length * quote.width : null;
-  return (
-    <View
-      style={[
-        styles.row,
-        !first && {
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: theme.backgroundSelected,
-        },
-      ]}>
-      <View style={styles.rowMain}>
-        <View style={styles.rowTitle}>
-          <ThemedText type="small">{quote.job_type ?? 'Quote'}</ThemedText>
-          {quote.status !== 'final' && (
-            <ThemedView type="backgroundSelected" style={styles.draftTag}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Draft
-              </ThemedText>
-            </ThemedView>
-          )}
+
+  // When a custom name is showing, the room type moves down into the metadata
+  // so it isn't lost — otherwise the metadata is just size and date.
+  const named = !!quote.customer_name?.trim();
+  const meta = [
+    named ? quote.job_type : null,
+    area !== null ? `${area.toLocaleString()} ${quote.unit}²` : null,
+    formatDate(quote.date_created),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  const body = (
+    <View style={styles.row}>
+      <View style={styles.main}>
+        <View style={styles.titleRow}>
+          <ThemedText type="bodyBold" numberOfLines={1} style={styles.title}>
+            {quoteLabel(quote)}
+          </ThemedText>
+          {quote.status !== 'final' && <ThemedText type="label">Draft</ThemedText>}
         </View>
-        <ThemedText type="small" themeColor="textSecondary">
-          {area !== null ? `${area.toLocaleString()} ${quote.unit}² · ` : ''}
-          {formatDate(quote.date_created)}
-        </ThemedText>
+        <ThemedText type="label">{meta}</ThemedText>
       </View>
-      <ThemedText type="smallBold" style={{ color: Accent }}>
-        {formatMoney(quote.grand_total ?? 0)}
+      {/* Bare figure — currency is established once in the list header. */}
+      <ThemedText type="bodyBold" tabular>
+        {formatAmount(quote.grand_total ?? 0)}
       </ThemedText>
     </View>
+  );
+
+  if (!onPress) return body;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Rename ${quoteLabel(quote)}`}
+      style={({ pressed }) => pressed && styles.pressed}>
+      {body}
+    </Pressable>
   );
 }
 
@@ -60,18 +80,19 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     paddingVertical: Spacing.three,
   },
-  rowMain: {
+  main: {
     flex: 1,
-    gap: Spacing.half,
+    gap: Spacing.one,
   },
-  rowTitle: {
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
   },
-  draftTag: {
-    paddingHorizontal: Spacing.one + Spacing.half,
-    paddingVertical: Spacing.half,
-    borderRadius: Spacing.two,
+  title: {
+    flexShrink: 1,
+  },
+  pressed: {
+    opacity: 0.5,
   },
 });

@@ -1,19 +1,20 @@
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Fragment, useState } from 'react';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { SecondaryButton } from '@/components/button';
+import { Divider } from '@/components/divider';
 import { QuoteStepScreen } from '@/components/quote-step-screen';
 import { StepFooter } from '@/components/step-footer';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { formatMoney } from '@/constants/quote';
+import { CURRENCY_CODE, formatAmount } from '@/constants/quote';
 import {
   buildMaterialPackages,
   type MaterialLineItem,
   type MaterialPackage,
 } from '@/constants/materials-mock';
-import { Accent, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { getArea, useQuoteDraft } from '@/context/quote-draft';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -21,6 +22,9 @@ import { useTheme } from '@/hooks/use-theme';
 // itemized packages (Budget / Standard / Premium) to choose from. In Phase 1
 // the options come from a deterministic mock; Phase 3 swaps in a Directus call
 // that runs the AI + retailer lookup. The response shape is identical either way.
+//
+// This is the one screen where the accent marks selection: the chosen tier card
+// is one of its three sanctioned uses.
 export default function MaterialsScreen() {
   const router = useRouter();
   const { draft, updateDraft } = useQuoteDraft();
@@ -62,47 +66,40 @@ export default function MaterialsScreen() {
         />
       }>
       {/* Free-text brief — feeds the AI lookup in Phase 3. */}
-      <ThemedView style={styles.section}>
-        <ThemedText type="smallBold">Describe the work</ThemedText>
-        <ThemedView type="backgroundElement" style={styles.briefRow}>
-          <BriefInput
-            value={draft.materialBrief}
-            onChangeText={(materialBrief) => updateDraft({ materialBrief })}
-            jobType={draft.jobType}
-          />
-        </ThemedView>
-      </ThemedView>
+      <View style={styles.section}>
+        <ThemedText type="label">Describe the work</ThemedText>
+        <BriefInput
+          value={draft.materialBrief}
+          onChangeText={(materialBrief) => updateDraft({ materialBrief })}
+          jobType={draft.jobType}
+        />
+      </View>
 
       {/* Optional ZIP — regional pricing once the lookup is real. */}
-      <ThemedView style={styles.section}>
-        <ThemedText type="smallBold">ZIP code (optional)</ThemedText>
+      <View style={styles.section}>
+        <ThemedText type="label">ZIP code (optional)</ThemedText>
         <ZipInput
           value={draft.materialZip}
           onChangeText={(materialZip) => updateDraft({ materialZip })}
         />
-      </ThemedView>
+      </View>
 
-      {/* Fetch / refresh options. */}
-      <Pressable onPress={getOptions} disabled={loading} style={({ pressed }) => pressed && styles.pressed}>
-        <View style={[styles.fetchButton, { backgroundColor: Accent }, loading && styles.disabled]}>
-          {loading ? (
-            <View style={styles.fetchLoading}>
-              <ActivityIndicator color="#ffffff" />
-              <ThemedText type="smallBold" style={styles.onAccent}>
-                Finding materials…
-              </ThemedText>
-            </View>
-          ) : (
-            <ThemedText type="smallBold" style={styles.onAccent}>
-              {packages ? 'Refresh options' : 'Get material options'}
-            </ThemedText>
-          )}
-        </View>
-      </Pressable>
+      {/* Fetch / refresh options. Secondary, not primary — "Continue" in the
+          footer is this screen's primary action and there is only ever one. */}
+      <SecondaryButton
+        label={loading ? 'Finding materials…' : packages ? 'Refresh options' : 'Get material options'}
+        onPress={getOptions}
+        disabled={loading}
+      />
 
       {/* Three package cards. */}
       {packages && !loading && (
-        <ThemedView style={styles.results}>
+        <View style={styles.results}>
+          <View style={styles.resultsHeader}>
+            <ThemedText type="label">Options</ThemedText>
+            <ThemedText type="label">{CURRENCY_CODE}</ThemedText>
+          </View>
+
           {packages.map((pkg) => (
             <PackageCard
               key={pkg.tier}
@@ -111,17 +108,19 @@ export default function MaterialsScreen() {
               onSelect={() => updateDraft({ selectedTier: pkg.tier })}
             />
           ))}
-          <ThemedText type="small" themeColor="textSecondary" style={styles.freshness}>
+
+          <ThemedText type="caption" themeColor="muted" style={styles.freshness}>
             AI estimate · approximate prices, as of {formatDate(packages[0].pricedAt)}
           </ThemedText>
-        </ThemedView>
+        </View>
       )}
     </QuoteStepScreen>
   );
 }
 
 // One selectable package: header (title / tagline / subtotal), the itemized
-// list, and a select button. The accent border marks the chosen one.
+// list, and a select action. These sit directly on the page background — they
+// are the content, not a wrapper around it — so they don't count as card-in-card.
 function PackageCard({
   pkg,
   selected,
@@ -131,74 +130,83 @@ function PackageCard({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const theme = useTheme();
+
   return (
-    <ThemedView type="backgroundElement" style={[styles.card, selected && styles.cardSelected]}>
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: theme.surface,
+          borderColor: selected ? theme.accent : theme.hairline,
+          borderWidth: selected ? 1.5 : StyleSheet.hairlineWidth,
+        },
+      ]}>
       <View style={styles.cardHeader}>
         <View style={styles.cardHeading}>
-          <ThemedText type="smallBold">{pkg.title}</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {pkg.tagline}
-          </ThemedText>
+          <ThemedText type="heading">{pkg.title}</ThemedText>
+          <ThemedText type="caption">{pkg.tagline}</ThemedText>
         </View>
-        <ThemedText type="subtitle" style={{ color: Accent }}>
-          {formatMoney(pkg.subtotal)}
+        <ThemedText type="heading" tabular>
+          {formatAmount(pkg.subtotal)}
         </ThemedText>
       </View>
 
       <View style={styles.items}>
         {pkg.items.map((item, i) => (
-          <LineItem key={item.name} item={item} first={i === 0} />
+          <Fragment key={item.name}>
+            {i > 0 && <Divider />}
+            <LineItem item={item} />
+          </Fragment>
         ))}
       </View>
 
-      <Pressable onPress={onSelect} style={({ pressed }) => pressed && styles.pressed}>
-        {selected ? (
-          <View style={[styles.selectButton, { backgroundColor: Accent }]}>
-            <ThemedText type="smallBold" style={styles.onAccent}>
-              ✓ Selected
-            </ThemedText>
-          </View>
-        ) : (
-          <ThemedView type="background" style={styles.selectButton}>
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              Select this package
-            </ThemedText>
-          </ThemedView>
-        )}
-      </Pressable>
-    </ThemedView>
+      {selected ? (
+        <View style={styles.selectedRow}>
+          <ThemedText type="label" themeColor="accent">
+            Selected
+          </ThemedText>
+        </View>
+      ) : (
+        <Pressable
+          onPress={onSelect}
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.selectButton,
+            { borderColor: theme.hairline },
+            pressed && styles.pressed,
+          ]}>
+          <ThemedText type="bodyBold" themeColor="body">
+            Select this package
+          </ThemedText>
+        </Pressable>
+      )}
+    </View>
   );
 }
 
 // A single material line: name + price, a plain-English explanation, the
-// quantity, and a tappable "Buy at <retailer>" link.
-function LineItem({ item, first }: { item: MaterialLineItem; first: boolean }) {
-  const theme = useTheme();
+// quantity, and a tappable "Buy at <retailer>" link. The link is `ink`, not
+// accent — the selected-card border is already this screen's accent.
+function LineItem({ item }: { item: MaterialLineItem }) {
   return (
-    <View
-      style={[
-        styles.item,
-        !first && {
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: theme.backgroundSelected,
-          paddingTop: Spacing.three,
-        },
-      ]}>
+    <View style={styles.item}>
       <View style={styles.itemHeader}>
-        <ThemedText type="small" style={styles.itemName}>
+        <ThemedText type="bodyBold" style={styles.itemName}>
           {item.name}
         </ThemedText>
-        <ThemedText type="small">{formatMoney(item.price)}</ThemedText>
-      </View>
-      <ThemedText type="small" themeColor="textSecondary">
-        {item.explanation}
-      </ThemedText>
-      <View style={styles.itemMeta}>
-        <ThemedText type="small" themeColor="textSecondary">
-          {item.quantity}
+        <ThemedText type="body" tabular>
+          {formatAmount(item.price)}
         </ThemedText>
-        <Pressable onPress={() => void WebBrowser.openBrowserAsync(item.url)}>
-          <ThemedText type="small" style={{ color: Accent }}>
+      </View>
+      <ThemedText type="caption">{item.explanation}</ThemedText>
+      <View style={styles.itemMeta}>
+        <ThemedText type="label">{item.quantity}</ThemedText>
+        <Pressable
+          accessibilityRole="link"
+          hitSlop={Spacing.two}
+          onPress={() => void WebBrowser.openBrowserAsync(item.url)}>
+          <ThemedText type="caption" themeColor="ink" style={styles.buyLink}>
             Buy at {item.retailer} ›
           </ThemedText>
         </Pressable>
@@ -217,35 +225,40 @@ function BriefInput({
   jobType: string | null;
 }) {
   const theme = useTheme();
+
   return (
     <TextInput
       value={value}
       onChangeText={onChangeText}
       placeholder={briefPlaceholder(jobType)}
-      placeholderTextColor={theme.textSecondary}
+      placeholderTextColor={theme.muted}
       multiline
-      style={[styles.briefInput, { color: theme.text }]}
+      style={[
+        styles.briefInput,
+        { color: theme.ink, backgroundColor: theme.surface, borderColor: theme.hairline },
+      ]}
     />
   );
 }
 
 function ZipInput({ value, onChangeText }: { value: string; onChangeText: (text: string) => void }) {
   const theme = useTheme();
+
   return (
-    <ThemedView type="backgroundElement" style={styles.inputRow}>
+    <View style={[styles.inputRow, { backgroundColor: theme.surface, borderColor: theme.hairline }]}>
       <TextInput
         value={value}
         onChangeText={onChangeText}
         placeholder="e.g. 78701"
-        placeholderTextColor={theme.textSecondary}
+        placeholderTextColor={theme.muted}
         keyboardType="number-pad"
         maxLength={5}
-        style={[styles.input, { color: theme.text }]}
+        style={[styles.input, { color: theme.ink }]}
       />
-      <ThemedText type="small" themeColor="textSecondary">
+      <ThemedText type="caption" themeColor="muted">
         for local pricing
       </ThemedText>
-    </ThemedView>
+    </View>
   );
 }
 
@@ -263,54 +276,41 @@ const styles = StyleSheet.create({
   section: {
     gap: Spacing.two,
   },
-  briefRow: {
-    borderRadius: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
-  },
   briefInput: {
-    minHeight: 72,
-    fontSize: 16,
+    minHeight: 88,
+    fontSize: 17,
+    lineHeight: 24,
     textAlignVertical: 'top',
-    paddingVertical: Spacing.two,
+    padding: Spacing.three,
+    borderRadius: Radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.one,
+    gap: Spacing.two,
     paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.three,
+    height: 50,
+    borderRadius: Radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   input: {
     flex: 1,
-    paddingVertical: Spacing.three,
-    fontSize: 16,
-  },
-  fetchButton: {
-    paddingVertical: Spacing.three,
-    borderRadius: Spacing.three,
-    alignItems: 'center',
-  },
-  fetchLoading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  onAccent: {
-    color: '#ffffff',
+    height: '100%',
+    fontSize: 17,
   },
   results: {
     gap: Spacing.three,
   },
+  resultsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   card: {
-    borderRadius: Spacing.four,
+    borderRadius: Radius.sheet,
     padding: Spacing.four,
     gap: Spacing.three,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  cardSelected: {
-    borderColor: Accent,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
   },
   cardHeading: {
     flex: 1,
-    gap: Spacing.half,
+    gap: Spacing.one,
   },
   items: {
     gap: Spacing.three,
@@ -335,26 +335,33 @@ const styles = StyleSheet.create({
   },
   itemName: {
     flex: 1,
-    fontWeight: '700',
   },
   itemMeta: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: Spacing.three,
+    paddingTop: Spacing.one,
+  },
+  buyLink: {
+    fontWeight: '600',
   },
   selectButton: {
-    paddingVertical: Spacing.three,
-    borderRadius: Spacing.three,
+    height: 44,
+    borderRadius: Radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedRow: {
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   freshness: {
     textAlign: 'center',
   },
   pressed: {
-    opacity: 0.7,
-  },
-  disabled: {
     opacity: 0.6,
   },
 });

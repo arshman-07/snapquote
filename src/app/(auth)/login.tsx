@@ -2,19 +2,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AuthErrorColor, AuthField } from '@/components/auth-field';
+import { AuthField } from '@/components/auth-field';
+import { PrimaryButton } from '@/components/button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Accent, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
 import { loginSchema, type LoginForm } from '@/lib/auth-schema';
 
@@ -64,84 +59,74 @@ export default function LoginScreen() {
         <KeyboardAvoidingView
           style={styles.content}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ThemedView style={styles.header}>
-            <ThemedText type="subtitle">Welcome back</ThemedText>
-            <ThemedText themeColor="textSecondary">
-              Sign in to start quoting.
-            </ThemedText>
-          </ThemedView>
+          <View style={styles.header}>
+            <ThemedText type="title">Welcome back</ThemedText>
+            <ThemedText themeColor="body">Sign in to start quoting.</ThemedText>
+          </View>
 
-          <Controller
-            control={control}
-            name="email"
-            render={({ field, fieldState }) => (
-              <AuthField
-                label="Email"
-                value={field.value}
-                onChangeText={field.onChange}
-                error={fieldState.error?.message}
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                textContentType="emailAddress"
-                placeholder="you@example.com"
-              />
-            )}
-          />
-          <Controller
-            control={control}
-            name="password"
-            render={({ field, fieldState }) => (
-              <AuthField
-                label="Password"
-                value={field.value}
-                onChangeText={field.onChange}
-                error={fieldState.error?.message}
-                secureTextEntry
-                autoCapitalize="none"
-                autoComplete="current-password"
-                textContentType="password"
-                placeholder="••••••••"
-                onSubmitEditing={canSubmit ? () => onSubmit() : undefined}
-              />
-            )}
-          />
+          <View style={styles.fields}>
+            <Controller
+              control={control}
+              name="email"
+              render={({ field, fieldState }) => (
+                <AuthField
+                  label="Email"
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  error={fieldState.error?.message}
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  keyboardType="email-address"
+                  textContentType="emailAddress"
+                  placeholder="you@example.com"
+                />
+              )}
+            />
+            <Controller
+              control={control}
+              name="password"
+              render={({ field, fieldState }) => (
+                <AuthField
+                  label="Password"
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  error={fieldState.error?.message}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoComplete="current-password"
+                  textContentType="password"
+                  placeholder="••••••••"
+                  onSubmitEditing={canSubmit ? () => onSubmit() : undefined}
+                />
+              )}
+            />
+          </View>
 
           {/* Server-side failure (bad credentials / offline) lives above the
               button so it survives field edits until the next attempt. */}
           {serverError && (
-            <ThemedText type="small" style={styles.serverError}>
+            <ThemedText type="caption" themeColor="danger">
               {serverError}
             </ThemedText>
           )}
 
-          <Pressable
+          <PrimaryButton
+            label="Sign in"
             onPress={onSubmit}
             disabled={!canSubmit}
-            style={({ pressed }) => pressed && styles.pressed}>
-            <ThemedView style={[styles.button, !canSubmit && styles.buttonDisabled]}>
-              {submitting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <ThemedText type="smallBold" style={styles.buttonLabel}>
-                  Sign in
-                </ThemedText>
-              )}
-            </ThemedView>
-          </Pressable>
+            loading={submitting}
+          />
 
-          <ThemedView style={styles.footRow}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Don&apos;t have an account yet?{' '}
-            </ThemedText>
+          <View style={styles.footRow}>
+            <ThemedText type="caption">Don&apos;t have an account yet? </ThemedText>
             <Link href="/sign-up" asChild>
-              <Pressable hitSlop={8}>
-                <ThemedText type="smallBold" style={styles.footLink}>
+              <Pressable hitSlop={Spacing.two}>
+                <ThemedText type="caption" themeColor="ink" style={styles.footLink}>
                   Sign up
                 </ThemedText>
               </Pressable>
             </Link>
-          </ThemedView>
+          </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </ThemedView>
@@ -159,33 +144,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: Spacing.four,
-    gap: Spacing.three,
+    gap: Spacing.four,
     width: '100%',
     maxWidth: 480,
     alignSelf: 'center',
   },
   header: {
-    gap: Spacing.one,
-    marginBottom: Spacing.two,
+    gap: Spacing.two,
   },
-  serverError: {
-    color: AuthErrorColor,
-  },
-  button: {
-    backgroundColor: Accent,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
-    borderRadius: Spacing.five,
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonLabel: {
-    color: '#fff',
-  },
-  pressed: {
-    opacity: 0.7,
+  fields: {
+    gap: Spacing.three,
   },
   footRow: {
     flexDirection: 'row',
@@ -194,6 +162,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   footLink: {
-    color: Accent,
+    fontWeight: '600',
   },
 });

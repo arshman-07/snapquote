@@ -2,7 +2,7 @@ import { readItems } from '@directus/sdk';
 import { useQuery } from '@tanstack/react-query';
 
 import { directus } from '@/lib/directus';
-import { type RecentQuote } from '@/hooks/use-recent-quotes';
+import { QUOTE_LIST_FIELDS, type RecentQuote } from '@/hooks/use-recent-quotes';
 
 // Every saved quote, newest first, for the Quotes tab. Same row shape as the
 // Home list. The key is ['quotes', 'all'] — a child of ['quotes'], which
@@ -15,7 +15,7 @@ export function useAllQuotes() {
     queryFn: () =>
       directus.request(
         readItems('quotes', {
-          fields: ['id', 'job_type', 'length', 'width', 'unit', 'grand_total', 'date_created', 'status'],
+          fields: [...QUOTE_LIST_FIELDS],
           sort: ['-date_created'],
           limit: 100,
         }),

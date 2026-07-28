@@ -3,19 +3,22 @@ import { Link } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AuthErrorColor, AuthField } from '@/components/auth-field';
+import { AuthField } from '@/components/auth-field';
+import { PrimaryButton } from '@/components/button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Accent, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
+import { useTheme } from '@/hooks/use-theme';
 import { registerSchema, type RegisterForm } from '@/lib/auth-schema';
 
 // Map a failed sign-up to something actionable. signUp does two calls
@@ -46,6 +49,7 @@ function registerErrorMessage(error: unknown): string {
 // register endpoint can't set them); see `signUp` in the auth context.
 export default function SignUpScreen() {
   const { signUp } = useAuth();
+  const theme = useTheme();
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -90,183 +94,183 @@ export default function SignUpScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
-          style={styles.content}
+          style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ThemedView style={styles.header}>
-            <ThemedText type="subtitle">Create your account</ThemedText>
-            <ThemedText themeColor="textSecondary">
-              Sign up to start quoting.
-            </ThemedText>
-          </ThemedView>
+          {/* This form runs to six fields once a type is picked, so it has to
+              scroll — centring it in a fixed view clipped the bottom. */}
+          <ScrollView
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled">
+            <View style={styles.header}>
+              <ThemedText type="title">Create your account</ThemedText>
+              <ThemedText themeColor="body">Sign up to start quoting.</ThemedText>
+            </View>
 
-          {/* Account type — decides which profile fields apply below. */}
-          <Controller
-            control={control}
-            name="userType"
-            render={({ field, fieldState }) => (
-              <ThemedView style={styles.field}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  I’m a…
-                </ThemedText>
-                <ThemedView style={styles.segment}>
-                  {(['contractor', 'homeowner'] as const).map((type) => {
-                    const selected = field.value === type;
-                    return (
-                      <Pressable
-                        key={type}
-                        onPress={() => field.onChange(type)}
-                        style={styles.segmentPressable}>
-                        <ThemedView
-                          type="backgroundElement"
+            {/* Account type — decides which profile fields apply below.
+                Selection is an `ink` fill, not the accent: this is a control,
+                and the accent stays reserved for progress, material tier and
+                status badges. */}
+            <Controller
+              control={control}
+              name="userType"
+              render={({ field, fieldState }) => (
+                <View style={styles.field}>
+                  <ThemedText type="label">I’m a…</ThemedText>
+                  <View style={[styles.segment, { borderColor: theme.hairline }]}>
+                    {(['contractor', 'homeowner'] as const).map((type, index) => {
+                      const selected = field.value === type;
+                      return (
+                        <Pressable
+                          key={type}
+                          onPress={() => field.onChange(type)}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected }}
                           style={[
                             styles.segmentItem,
-                            selected && styles.segmentItemSelected,
+                            selected && { backgroundColor: theme.ink },
+                            index === 1 && {
+                              borderLeftWidth: StyleSheet.hairlineWidth,
+                              borderLeftColor: theme.hairline,
+                            },
                           ]}>
                           <ThemedText
-                            type="smallBold"
-                            style={selected ? styles.segmentLabelSelected : undefined}>
+                            type="bodyBold"
+                            themeColor={selected ? 'onInk' : 'body'}>
                             {type === 'contractor' ? 'Contractor' : 'Homeowner'}
                           </ThemedText>
-                        </ThemedView>
-                      </Pressable>
-                    );
-                  })}
-                </ThemedView>
-                {fieldState.error && (
-                  <ThemedText type="small" style={styles.serverError}>
-                    {fieldState.error.message}
-                  </ThemedText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  {fieldState.error && (
+                    <ThemedText type="caption" themeColor="danger">
+                      {fieldState.error.message}
+                    </ThemedText>
+                  )}
+                </View>
+              )}
+            />
+
+            <View style={styles.fields}>
+              {/* Contractors give a company name; the name field below then asks
+                  for the owner. Homeowners just give their own name. */}
+              {userType === 'contractor' && (
+                <Controller
+                  control={control}
+                  name="companyName"
+                  render={({ field, fieldState }) => (
+                    <AuthField
+                      label="Company name"
+                      value={field.value}
+                      onChangeText={field.onChange}
+                      error={fieldState.error?.message}
+                      autoCapitalize="words"
+                      autoComplete="organization"
+                      placeholder="Acme Renovations"
+                    />
+                  )}
+                />
+              )}
+              {userType && (
+                <Controller
+                  control={control}
+                  name="fullName"
+                  render={({ field, fieldState }) => (
+                    <AuthField
+                      label={userType === 'contractor' ? "Company owner’s name" : 'Your name'}
+                      value={field.value}
+                      onChangeText={field.onChange}
+                      error={fieldState.error?.message}
+                      autoCapitalize="words"
+                      autoComplete="name"
+                      placeholder="Jane Smith"
+                    />
+                  )}
+                />
+              )}
+
+              <Controller
+                control={control}
+                name="email"
+                render={({ field, fieldState }) => (
+                  <AuthField
+                    label="Email"
+                    value={field.value}
+                    onChangeText={field.onChange}
+                    error={fieldState.error?.message}
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    keyboardType="email-address"
+                    textContentType="emailAddress"
+                    placeholder="you@example.com"
+                  />
                 )}
-              </ThemedView>
-            )}
-          />
+              />
+              <Controller
+                control={control}
+                name="password"
+                render={({ field, fieldState }) => (
+                  <AuthField
+                    label="Password"
+                    value={field.value}
+                    onChangeText={field.onChange}
+                    error={fieldState.error?.message}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoComplete="new-password"
+                    textContentType="newPassword"
+                    placeholder="At least 8 characters"
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="confirmPassword"
+                render={({ field, fieldState }) => (
+                  <AuthField
+                    label="Confirm password"
+                    value={field.value}
+                    onChangeText={field.onChange}
+                    error={fieldState.error?.message}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoComplete="new-password"
+                    textContentType="newPassword"
+                    placeholder="••••••••"
+                    onSubmitEditing={canSubmit ? () => onSubmit() : undefined}
+                  />
+                )}
+              />
+            </View>
 
-          {/* Contractors give a company name; the name field below then asks
-              for the owner. Homeowners just give their own name. */}
-          {userType === 'contractor' && (
-            <Controller
-              control={control}
-              name="companyName"
-              render={({ field, fieldState }) => (
-                <AuthField
-                  label="Company name"
-                  value={field.value}
-                  onChangeText={field.onChange}
-                  error={fieldState.error?.message}
-                  autoCapitalize="words"
-                  autoComplete="organization"
-                  placeholder="Acme Renovations"
-                />
-              )}
+            {/* Server-side failure (email taken / offline / registration off)
+                lives above the button so it survives field edits until the next
+                attempt. */}
+            {serverError && (
+              <ThemedText type="caption" themeColor="danger">
+                {serverError}
+              </ThemedText>
+            )}
+
+            <PrimaryButton
+              label="Create account"
+              onPress={onSubmit}
+              disabled={!canSubmit}
+              loading={submitting}
             />
-          )}
-          {userType && (
-            <Controller
-              control={control}
-              name="fullName"
-              render={({ field, fieldState }) => (
-                <AuthField
-                  label={userType === 'contractor' ? "Company owner’s name" : 'Your name'}
-                  value={field.value}
-                  onChangeText={field.onChange}
-                  error={fieldState.error?.message}
-                  autoCapitalize="words"
-                  autoComplete="name"
-                  placeholder="Jane Smith"
-                />
-              )}
-            />
-          )}
 
-          <Controller
-            control={control}
-            name="email"
-            render={({ field, fieldState }) => (
-              <AuthField
-                label="Email"
-                value={field.value}
-                onChangeText={field.onChange}
-                error={fieldState.error?.message}
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                textContentType="emailAddress"
-                placeholder="you@example.com"
-              />
-            )}
-          />
-          <Controller
-            control={control}
-            name="password"
-            render={({ field, fieldState }) => (
-              <AuthField
-                label="Password"
-                value={field.value}
-                onChangeText={field.onChange}
-                error={fieldState.error?.message}
-                secureTextEntry
-                autoCapitalize="none"
-                autoComplete="new-password"
-                textContentType="newPassword"
-                placeholder="At least 8 characters"
-              />
-            )}
-          />
-          <Controller
-            control={control}
-            name="confirmPassword"
-            render={({ field, fieldState }) => (
-              <AuthField
-                label="Confirm password"
-                value={field.value}
-                onChangeText={field.onChange}
-                error={fieldState.error?.message}
-                secureTextEntry
-                autoCapitalize="none"
-                autoComplete="new-password"
-                textContentType="newPassword"
-                placeholder="••••••••"
-                onSubmitEditing={canSubmit ? () => onSubmit() : undefined}
-              />
-            )}
-          />
-
-          {/* Server-side failure (email taken / offline / registration off)
-              lives above the button so it survives field edits until the next
-              attempt. */}
-          {serverError && (
-            <ThemedText type="small" style={styles.serverError}>
-              {serverError}
-            </ThemedText>
-          )}
-
-          <Pressable
-            onPress={onSubmit}
-            disabled={!canSubmit}
-            style={({ pressed }) => pressed && styles.pressed}>
-            <ThemedView style={[styles.button, !canSubmit && styles.buttonDisabled]}>
-              {submitting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <ThemedText type="smallBold" style={styles.buttonLabel}>
-                  Create account
-                </ThemedText>
-              )}
-            </ThemedView>
-          </Pressable>
-
-          <ThemedView style={styles.footRow}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Already have an account?{' '}
-            </ThemedText>
-            <Link href="/login" asChild>
-              <Pressable hitSlop={8}>
-                <ThemedText type="smallBold" style={styles.footLink}>
-                  Sign in
-                </ThemedText>
-              </Pressable>
-            </Link>
-          </ThemedView>
+            <View style={styles.footRow}>
+              <ThemedText type="caption">Already have an account? </ThemedText>
+              <Link href="/login" asChild>
+                <Pressable hitSlop={Spacing.two}>
+                  <ThemedText type="caption" themeColor="ink" style={styles.footLink}>
+                    Sign in
+                  </ThemedText>
+                </Pressable>
+              </Link>
+            </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </ThemedView>
@@ -280,58 +284,39 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  content: {
+  flex: {
     flex: 1,
+  },
+  content: {
+    flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: Spacing.four,
-    gap: Spacing.three,
+    paddingVertical: Spacing.five,
+    gap: Spacing.four,
     width: '100%',
     maxWidth: 480,
     alignSelf: 'center',
   },
   header: {
-    gap: Spacing.one,
-    marginBottom: Spacing.two,
-  },
-  serverError: {
-    color: AuthErrorColor,
+    gap: Spacing.two,
   },
   field: {
-    gap: Spacing.one,
+    gap: Spacing.two,
+  },
+  fields: {
+    gap: Spacing.three,
   },
   segment: {
     flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  segmentPressable: {
-    flex: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Radius.control,
+    overflow: 'hidden',
   },
   segmentItem: {
-    paddingVertical: Spacing.three,
-    borderRadius: Spacing.three,
+    flex: 1,
+    height: 50,
     alignItems: 'center',
-  },
-  segmentItemSelected: {
-    backgroundColor: Accent,
-  },
-  segmentLabelSelected: {
-    color: '#fff',
-  },
-  button: {
-    backgroundColor: Accent,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
-    borderRadius: Spacing.five,
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonLabel: {
-    color: '#fff',
-  },
-  pressed: {
-    opacity: 0.7,
+    justifyContent: 'center',
   },
   footRow: {
     flexDirection: 'row',
@@ -340,6 +325,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   footLink: {
-    color: Accent,
+    fontWeight: '600',
   },
 });

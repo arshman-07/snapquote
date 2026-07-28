@@ -1,14 +1,14 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { Divider } from '@/components/divider';
 import { QuoteStepScreen } from '@/components/quote-step-screen';
 import { StepFooter } from '@/components/step-footer';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { JOB_TYPES, UNITS, type Unit } from '@/constants/quote';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useQuoteDraft } from '@/context/quote-draft';
 import { useRoomTypes } from '@/hooks/use-room-types';
 import { useTheme } from '@/hooks/use-theme';
@@ -18,10 +18,6 @@ import { dimensionsSchema, type DimensionsForm } from '@/lib/quote-schema';
 // has names only (id null), which is fine — an offline quote just can't record
 // the stable reference.
 type RoomTypeChip = { id: number | null; name: string };
-
-// Validation error text colour — the theme has no dedicated error key, so keep
-// it a single local constant (same spirit as Accent).
-const ErrorColor = '#e5484d';
 
 // Parse a dimension string to a positive number, else null (mirrors the schema).
 function parseDimension(raw: string): number | null {
@@ -36,6 +32,7 @@ function parseDimension(raw: string): number | null {
 export default function DimensionsScreen() {
   const router = useRouter();
   const { draft, updateDraft } = useQuoteDraft();
+  const theme = useTheme();
 
   // Room types come from Directus. While loading we show a spinner; on error /
   // offline we fall back to the static list so a quote can always be started.
@@ -90,123 +87,139 @@ export default function DimensionsScreen() {
           onPrimary={onContinue}
         />
       }>
-      {/* Job / room type — selectable chips, fetched from Directus. */}
-      <ThemedView style={styles.section}>
-        <ThemedText type="smallBold">Job type</ThemedText>
+      {/* Job / room type — selectable chips, fetched from Directus. Selection
+          is an `ink` fill; the accent belongs to the progress bar. */}
+      <View style={styles.section}>
+        <ThemedText type="label">Job type</ThemedText>
         {roomTypesQuery.isLoading ? (
-          <ThemedView style={styles.chipLoading}>
+          <View style={styles.chipLoading}>
             <ActivityIndicator />
-            <ThemedText type="small" themeColor="textSecondary">
-              Loading room types…
-            </ThemedText>
-          </ThemedView>
+            <ThemedText type="caption">Loading room types…</ThemedText>
+          </View>
         ) : (
-          <ThemedView style={styles.chipRow}>
+          <View style={styles.chipRow}>
             {roomTypes.map((rt) => {
               // Prefer id equality when we have it; fall back to name (offline).
               const selected = rt.id !== null ? rt.id === jobTypeId : rt.name === jobType;
               return (
                 <Pressable
                   key={rt.id ?? rt.name}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
                   onPress={() => {
                     // Set both together, validating so the Continue gate updates.
                     setValue('jobTypeId', rt.id, { shouldValidate: true });
                     setValue('jobType', rt.name, { shouldValidate: true });
-                  }}>
-                  <ThemedView
-                    type={selected ? 'backgroundSelected' : 'backgroundElement'}
-                    style={styles.chip}>
-                    <ThemedText type="small">{rt.name}</ThemedText>
-                  </ThemedView>
+                  }}
+                  style={({ pressed }) => [
+                    styles.chip,
+                    {
+                      backgroundColor: selected ? theme.ink : theme.surface,
+                      borderColor: selected ? theme.ink : theme.hairline,
+                    },
+                    pressed && styles.pressed,
+                  ]}>
+                  <ThemedText type="body" themeColor={selected ? 'onInk' : 'body'}>
+                    {rt.name}
+                  </ThemedText>
                 </Pressable>
               );
             })}
-          </ThemedView>
+          </View>
         )}
         {usingFallback && (
-          <ThemedText type="small" themeColor="textSecondary">
-            Offline — showing a default room list.
-          </ThemedText>
+          <ThemedText type="caption">Offline — showing a default room list.</ThemedText>
         )}
-      </ThemedView>
+      </View>
 
-      {/* Unit toggle (ft / m) — a small segmented control. Changing it re-runs
-          validation because the allowed dimension ranges are unit-dependent. */}
-      <ThemedView style={styles.section}>
-        <ThemedText type="smallBold">Units</ThemedText>
-        <ThemedView type="backgroundElement" style={styles.toggle}>
-          {UNITS.map((u) => {
+      {/* Unit toggle (ft / m). Changing it re-runs validation because the
+          allowed dimension ranges are unit-dependent. */}
+      <View style={styles.section}>
+        <ThemedText type="label">Units</ThemedText>
+        <View style={[styles.toggle, { borderColor: theme.hairline }]}>
+          {UNITS.map((u, index) => {
             const selected = u === unit;
             return (
               <Pressable
                 key={u}
-                style={styles.toggleItem}
-                onPress={() => setValue('unit', u, { shouldValidate: true })}>
-                <ThemedView
-                  type={selected ? 'backgroundSelected' : 'backgroundElement'}
-                  style={styles.toggleItemInner}>
-                  <ThemedText type="small">{u}</ThemedText>
-                </ThemedView>
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                onPress={() => setValue('unit', u, { shouldValidate: true })}
+                style={[
+                  styles.toggleItem,
+                  selected && { backgroundColor: theme.ink },
+                  index > 0 && {
+                    borderLeftWidth: StyleSheet.hairlineWidth,
+                    borderLeftColor: theme.hairline,
+                  },
+                ]}>
+                <ThemedText type="bodyBold" themeColor={selected ? 'onInk' : 'body'}>
+                  {u}
+                </ThemedText>
               </Pressable>
             );
           })}
-        </ThemedView>
-      </ThemedView>
+        </View>
+      </View>
 
       {/* Dimensions. Height is optional — only some jobs need it. */}
-      <ThemedView style={styles.section}>
-        <ThemedText type="smallBold">Dimensions ({unit})</ThemedText>
-        <Controller
-          control={control}
-          name="length"
-          render={({ field, fieldState }) => (
-            <DimensionField
-              label="Length"
-              value={field.value}
-              onChangeText={field.onChange}
-              unit={unit}
-              error={fieldState.error?.message}
-            />
-          )}
-        />
-        <Controller
-          control={control}
-          name="width"
-          render={({ field, fieldState }) => (
-            <DimensionField
-              label="Width"
-              value={field.value}
-              onChangeText={field.onChange}
-              unit={unit}
-              error={fieldState.error?.message}
-            />
-          )}
-        />
-        <Controller
-          control={control}
-          name="height"
-          render={({ field, fieldState }) => (
-            <DimensionField
-              label="Height (optional)"
-              value={field.value}
-              onChangeText={field.onChange}
-              unit={unit}
-              error={fieldState.error?.message}
-            />
-          )}
-        />
-      </ThemedView>
+      <View style={styles.section}>
+        <ThemedText type="label">Dimensions ({unit})</ThemedText>
+        <View style={styles.fields}>
+          <Controller
+            control={control}
+            name="length"
+            render={({ field, fieldState }) => (
+              <DimensionField
+                label="Length"
+                value={field.value}
+                onChangeText={field.onChange}
+                unit={unit}
+                error={fieldState.error?.message}
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="width"
+            render={({ field, fieldState }) => (
+              <DimensionField
+                label="Width"
+                value={field.value}
+                onChangeText={field.onChange}
+                unit={unit}
+                error={fieldState.error?.message}
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="height"
+            render={({ field, fieldState }) => (
+              <DimensionField
+                label="Height (optional)"
+                value={field.value}
+                onChangeText={field.onChange}
+                unit={unit}
+                error={fieldState.error?.message}
+              />
+            )}
+          />
+        </View>
+      </View>
 
-      {/* Live floor-area readout once length and width are valid. */}
+      {/* Live floor-area readout once length and width are valid. Not a card —
+          a hairline and a big number carry it. */}
       {area !== null && (
-        <ThemedView type="backgroundElement" style={styles.areaCard}>
-          <ThemedText type="small" themeColor="textSecondary">
-            Floor area
-          </ThemedText>
-          <ThemedText type="subtitle">
-            {area.toLocaleString()} {unit}²
-          </ThemedText>
-        </ThemedView>
+        <View style={styles.readout}>
+          <Divider />
+          <View style={styles.readoutBody}>
+            <ThemedText type="label">Floor area</ThemedText>
+            <ThemedText type="display" tabular>
+              {area.toLocaleString()} {unit}²
+            </ThemedText>
+          </View>
+        </View>
       )}
     </QuoteStepScreen>
   );
@@ -228,30 +241,33 @@ function DimensionField({
   error?: string;
 }) {
   const theme = useTheme();
+
   return (
-    <ThemedView style={styles.field}>
-      <ThemedText type="small" themeColor="textSecondary">
-        {label}
-      </ThemedText>
-      <ThemedView type="backgroundElement" style={styles.inputRow}>
+    <View style={styles.field}>
+      <ThemedText type="label">{label}</ThemedText>
+      <View
+        style={[
+          styles.inputRow,
+          { backgroundColor: theme.surface, borderColor: error ? theme.danger : theme.hairline },
+        ]}>
         <TextInput
           value={value}
           onChangeText={onChangeText}
           keyboardType="decimal-pad"
           placeholder="0"
-          placeholderTextColor={theme.textSecondary}
-          style={[styles.input, { color: theme.text }]}
+          placeholderTextColor={theme.muted}
+          style={[styles.input, { color: theme.ink }]}
         />
-        <ThemedText type="small" themeColor="textSecondary">
+        <ThemedText type="body" themeColor="muted">
           {unit}
         </ThemedText>
-      </ThemedView>
+      </View>
       {error && (
-        <ThemedText type="small" style={{ color: ErrorColor }}>
+        <ThemedText type="caption" themeColor="danger">
           {error}
         </ThemedText>
       )}
-    </ThemedView>
+    </View>
   );
 }
 
@@ -273,39 +289,49 @@ const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
-    borderRadius: Spacing.five,
+    borderRadius: Radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   toggle: {
     flexDirection: 'row',
-    borderRadius: Spacing.three,
-    padding: Spacing.half,
+    borderRadius: Radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
     alignSelf: 'flex-start',
+    overflow: 'hidden',
   },
   toggleItem: {
-    minWidth: 56,
-  },
-  toggleItemInner: {
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.two + Spacing.half,
+    minWidth: 64,
+    height: 44,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fields: {
+    gap: Spacing.three,
   },
   field: {
-    gap: Spacing.one,
+    gap: Spacing.two,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.three,
+    gap: Spacing.two,
+    height: 50,
+    borderRadius: Radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   input: {
     flex: 1,
-    paddingVertical: Platform.OS === 'ios' ? Spacing.three : Spacing.two,
-    fontSize: 16,
+    height: '100%',
+    fontSize: 17,
   },
-  areaCard: {
-    padding: Spacing.four,
-    borderRadius: Spacing.four,
+  readout: {
+    gap: Spacing.three,
+  },
+  readoutBody: {
     gap: Spacing.one,
+  },
+  pressed: {
+    opacity: 0.6,
   },
 });

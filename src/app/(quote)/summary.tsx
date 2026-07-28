@@ -1,14 +1,13 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Alert, StyleSheet, Switch, View } from 'react-native';
+import { Alert, StyleSheet, Switch, TextInput, View } from 'react-native';
 
+import { Divider } from '@/components/divider';
 import { QuoteStepScreen } from '@/components/quote-step-screen';
 import { StepFooter } from '@/components/step-footer';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { formatMoney } from '@/constants/quote';
+import { CURRENCY_CODE, formatAmount } from '@/constants/quote';
 import { type MaterialLineItem } from '@/constants/materials-mock';
-import { Accent, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import {
   getArea,
   getLabourTotal,
@@ -18,6 +17,7 @@ import {
   useQuoteDraft,
 } from '@/context/quote-draft';
 import { useSaveQuote } from '@/hooks/use-save-quote';
+import { useEditQuote } from '@/hooks/use-update-quote';
 import { useTheme } from '@/hooks/use-theme';
 import { buildQuotePayload } from '@/lib/quote-payload';
 
@@ -26,12 +26,19 @@ import { buildQuotePayload } from '@/lib/quote-payload';
 // line, and a headline grand total. Read-only — no buy links here, just the
 // numbers. Done persists the quote to Directus (as a draft unless "Mark as
 // final" is on), then clears the local draft and returns home.
+//
+// Typography carries this screen: 11px labels against a 34px total, with every
+// figure bare and tabular. The currency is declared once, in the breakdown
+// header, so no line repeats a "$".
 export default function SummaryScreen() {
   const router = useRouter();
-  const { draft, reset } = useQuoteDraft();
+  const { draft, updateDraft, reset, editingId } = useQuoteDraft();
+  const theme = useTheme();
   const saveQuote = useSaveQuote();
-  // Quotes save as 'draft' unless the user explicitly marks this one final.
-  const [markFinal, setMarkFinal] = useState(false);
+  const editQuote = useEditQuote();
+  // Editing an existing quote patches it in place; otherwise this creates one.
+  const isEditing = editingId !== null;
+  const saving = saveQuote.isPending || editQuote.isPending;
 
   const area = getArea(draft);
   const pkg = getSelectedPackage(draft);
@@ -49,19 +56,41 @@ export default function SummaryScreen() {
   }
 
   // Done → persist to Directus, then leave. On failure the quote isn't lost
-  // silently: the user chooses between retrying and finishing unsaved.
+  // silently: the user chooses between retrying and leaving.
   function finish() {
-    saveQuote.mutate(buildQuotePayload(draft, markFinal ? 'final' : 'draft'), {
-      onSuccess: leave,
-      onError: () => {
-        Alert.alert("Couldn't save quote", 'Check your connection and try again.', [
+    const payload = buildQuotePayload(draft);
+
+    const onError = () => {
+      Alert.alert(
+        isEditing ? "Couldn't save changes" : "Couldn't save quote",
+        'Check your connection and try again.',
+        [
           { text: 'Retry', onPress: finish },
-          { text: 'Finish without saving', style: 'destructive', onPress: leave },
+          {
+            // Wording matters: on an edit the original quote still exists
+            // untouched, so "discard changes" is accurate where "finish without
+            // saving" would imply the whole quote is being thrown away.
+            text: isEditing ? 'Discard changes' : 'Finish without saving',
+            style: 'destructive',
+            onPress: leave,
+          },
           { text: 'Cancel', style: 'cancel' },
-        ]);
-      },
-    });
+        ],
+      );
+    };
+
+    if (isEditing) {
+      editQuote.mutate({ id: editingId, ...payload }, { onSuccess: leave, onError });
+    } else {
+      saveQuote.mutate(payload, { onSuccess: leave, onError });
+    }
   }
+
+  // Job recap as a single metadata line — the step header already names the
+  // room, so a separate recap card would just restate it.
+  const recap = [draft.jobType, area !== null ? `${area.toLocaleString()} ${draft.unit}²` : null]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <QuoteStepScreen
@@ -71,77 +100,97 @@ export default function SummaryScreen() {
       description="A rough estimate based on what you entered."
       footer={
         <StepFooter
-          primaryLabel={saveQuote.isPending ? 'Saving…' : 'Done'}
-          primaryDisabled={saveQuote.isPending}
+          primaryLabel={isEditing ? 'Save changes' : 'Done'}
+          primaryLoading={saving}
           onPrimary={finish}
           onBack={() => router.back()}
         />
       }>
-      {/* Job recap — room + floor area for context. */}
-      <ThemedView type="backgroundElement" style={styles.recapCard}>
-        <ThemedText type="small" themeColor="textSecondary">
-          {draft.jobType ?? 'New quote'}
-        </ThemedText>
-        {area !== null && (
-          <ThemedText type="subtitle">
-            {area.toLocaleString()} {draft.unit}²
-          </ThemedText>
-        )}
-      </ThemedView>
+      {/* Optional label for the quote. Left blank, the lists fall back to the
+          room type — so this never blocks finishing, and it can equally be set
+          later by tapping the quote in Home or the Quotes tab. */}
+      <View style={styles.nameSection}>
+        <ThemedText type="label">Name this quote (optional)</ThemedText>
+        <TextInput
+          value={draft.customerName}
+          onChangeText={(customerName) => updateDraft({ customerName })}
+          placeholder={draft.jobType ? `e.g. Mrs Patel — ${draft.jobType}` : 'e.g. Mrs Patel'}
+          placeholderTextColor={theme.muted}
+          autoCapitalize="words"
+          maxLength={120}
+          style={[
+            styles.nameInput,
+            { color: theme.ink, backgroundColor: theme.surface, borderColor: theme.hairline },
+          ]}
+        />
+      </View>
 
-      {/* Materials — the chosen package's itemized lines + subtotal. */}
-      <Section title="Materials" subtotal={materialsTotal}>
-        {pkg ? (
-          <View style={styles.lines}>
-            <ThemedText type="small" themeColor="textSecondary">
-              {pkg.title} package
+      <View style={styles.breakdown}>
+        {/* Currency is declared here, once, for every figure below. */}
+        <View style={styles.breakdownHeader}>
+          <ThemedText type="label">{recap || 'Breakdown'}</ThemedText>
+          <ThemedText type="label">{CURRENCY_CODE}</ThemedText>
+        </View>
+
+        <Divider />
+
+        {/* Materials — the chosen package's itemized lines + subtotal. */}
+        <Section title="Materials" subtotal={materialsTotal}>
+          {pkg ? (
+            <View style={styles.lines}>
+              <ThemedText type="caption">{pkg.title} package</ThemedText>
+              {pkg.items.map((item) => (
+                <SummaryLine key={item.name} item={item} />
+              ))}
+            </View>
+          ) : (
+            <ThemedText type="caption">No materials selected.</ThemedText>
+          )}
+        </Section>
+
+        <Divider />
+
+        {/* Labour — a single days × rate line. */}
+        <Section title="Labour" subtotal={labourTotal}>
+          {labourTotal > 0 ? (
+            <ThemedText type="caption" tabular>
+              {days} {days === 1 ? 'day' : 'days'} × {formatAmount(rate)} / day
             </ThemedText>
-            {pkg.items.map((item) => (
-              <SummaryLine key={item.name} item={item} />
-            ))}
-          </View>
-        ) : (
-          <ThemedText type="small" themeColor="textSecondary">
-            No materials selected.
-          </ThemedText>
-        )}
-      </Section>
+          ) : (
+            <ThemedText type="caption">No labour added.</ThemedText>
+          )}
+        </Section>
 
-      {/* Labour — a single days × rate line. */}
-      <Section title="Labour" subtotal={labourTotal}>
-        {labourTotal > 0 ? (
-          <ThemedText type="small" themeColor="textSecondary">
-            {days} {days === 1 ? 'day' : 'days'} × {formatMoney(rate)}/day
-          </ThemedText>
-        ) : (
-          <ThemedText type="small" themeColor="textSecondary">
-            No labour added.
-          </ThemedText>
-        )}
-      </Section>
+        <Divider />
 
-      {/* Grand total — the headline of the screen. */}
-      <ThemedView type="backgroundElement" style={styles.totalCard}>
-        <ThemedText type="small" themeColor="textSecondary">
-          Estimated total
-        </ThemedText>
-        <ThemedText type="title" style={{ color: Accent }}>
-          {formatMoney(total)}
-        </ThemedText>
-      </ThemedView>
-
-      {/* Save-as toggle — quotes stay drafts unless the user calls this one done. */}
-      <ThemedView type="backgroundElement" style={styles.finalRow}>
-        <View style={styles.finalLabel}>
-          <ThemedText type="smallBold">Mark as final</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {markFinal ? 'Saved as a final quote' : 'Saved as a draft'}
+        {/* Grand total. No "Total" label — it's the largest figure on the screen,
+            sitting alone below a rule after two subtotals. Naming it would be
+            restating what the hierarchy already says. */}
+        <View style={styles.total}>
+          <ThemedText type="display" tabular>
+            {formatAmount(total)}
           </ThemedText>
         </View>
-        <Switch value={markFinal} onValueChange={setMarkFinal} trackColor={{ true: Accent }} />
-      </ThemedView>
+      </View>
 
-      <ThemedText type="small" themeColor="textSecondary" style={styles.disclaimer}>
+      {/* Save-as toggle — quotes stay drafts unless the user calls this one done.
+          The switch tracks `ink`, not the accent: the progress bar above is
+          already this screen's one accent element. */}
+      <View style={styles.finalRow}>
+        <View style={styles.finalLabel}>
+          <ThemedText type="bodyBold">Mark as final</ThemedText>
+          <ThemedText type="caption">
+            {draft.status === 'final' ? 'Saved as a final quote' : 'Saved as a draft'}
+          </ThemedText>
+        </View>
+        <Switch
+          value={draft.status === 'final'}
+          onValueChange={(final) => updateDraft({ status: final ? 'final' : 'draft' })}
+          trackColor={{ true: theme.ink, false: theme.hairline }}
+        />
+      </View>
+
+      <ThemedText type="caption" themeColor="muted" style={styles.disclaimer}>
         Rough estimate{pkg ? ` · approximate material prices as of ${formatDate(pkg.pricedAt)}` : ''}
       </ThemedText>
     </QuoteStepScreen>
@@ -159,28 +208,29 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <ThemedView style={styles.section}>
+    <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <ThemedText type="smallBold">{title}</ThemedText>
-        <ThemedText type="smallBold">{formatMoney(subtotal)}</ThemedText>
+        <ThemedText type="label">{title}</ThemedText>
+        <ThemedText type="bodyBold" tabular>
+          {formatAmount(subtotal)}
+        </ThemedText>
       </View>
       {children}
-    </ThemedView>
+    </View>
   );
 }
 
 // One read-only material line: name + quantity on the left, price on the right.
 function SummaryLine({ item }: { item: MaterialLineItem }) {
-  const theme = useTheme();
   return (
-    <View style={[styles.line, { borderTopColor: theme.backgroundSelected }]}>
+    <View style={styles.line}>
       <View style={styles.lineName}>
-        <ThemedText type="small">{item.name}</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          {item.quantity}
-        </ThemedText>
+        <ThemedText type="body">{item.name}</ThemedText>
+        <ThemedText type="label">{item.quantity}</ThemedText>
       </View>
-      <ThemedText type="small">{formatMoney(item.price)}</ThemedText>
+      <ThemedText type="body" tabular>
+        {formatAmount(item.price)}
+      </ThemedText>
     </View>
   );
 }
@@ -190,10 +240,24 @@ function formatDate(iso: string): string {
 }
 
 const styles = StyleSheet.create({
-  recapCard: {
-    padding: Spacing.four,
-    borderRadius: Spacing.four,
-    gap: Spacing.one,
+  nameSection: {
+    gap: Spacing.two,
+  },
+  nameInput: {
+    height: 50,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
+    fontSize: 17,
+  },
+  breakdown: {
+    gap: Spacing.three,
+  },
+  breakdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Spacing.three,
   },
   section: {
     gap: Spacing.two,
@@ -201,39 +265,34 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'baseline',
+    alignItems: 'center',
     gap: Spacing.three,
   },
   lines: {
-    gap: Spacing.two,
+    gap: Spacing.three,
   },
   line: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     gap: Spacing.three,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: Spacing.two,
   },
   lineName: {
     flex: 1,
-    gap: Spacing.half,
-  },
-  totalCard: {
-    padding: Spacing.four,
-    borderRadius: Spacing.four,
     gap: Spacing.one,
+  },
+  total: {
+    alignItems: 'flex-end',
+    paddingTop: Spacing.one,
   },
   finalRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.three,
-    padding: Spacing.four,
-    borderRadius: Spacing.four,
   },
   finalLabel: {
-    gap: Spacing.half,
+    gap: Spacing.one,
     flex: 1,
   },
   disclaimer: {

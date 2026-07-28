@@ -1,11 +1,11 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { SecondaryButton, TextButton } from '@/components/button';
 import { QuoteStepScreen } from '@/components/quote-step-screen';
 import { StepFooter } from '@/components/step-footer';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Accent, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useQuoteDraft } from '@/context/quote-draft';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -31,69 +31,67 @@ export default function PhotoScreen() {
         />
       }>
       {draft.photoAdded ? (
-        // Added state — a placeholder thumbnail (no real image yet) plus a way
-        // to remove it. Phase 3 swaps the tile for the actual captured photo.
-        <ThemedView style={styles.section}>
-          <ThemedView type="backgroundElement" style={styles.thumb}>
-            <ThemedText style={styles.thumbGlyph}>✓</ThemedText>
-            <ThemedText type="smallBold">Photo added</ThemedText>
-          </ThemedView>
-          <Pressable
-            onPress={() => updateDraft({ photoAdded: false })}
-            style={({ pressed }) => pressed && styles.pressed}>
-            <ThemedText type="smallBold" style={[styles.removeLabel, { color: Accent }]}>
-              Remove photo
-            </ThemedText>
-          </Pressable>
-        </ThemedView>
+        // Added state — a placeholder tile (no real image yet) plus a way to
+        // remove it. Phase 3 swaps the tile for the actual captured photo.
+        <View style={styles.section}>
+          <PhotoTile />
+          <TextButton label="Remove photo" onPress={() => updateDraft({ photoAdded: false })} />
+        </View>
       ) : (
         // Empty state — a tappable dropzone and the two capture entry points.
-        <ThemedView style={styles.section}>
+        <View style={styles.section}>
           <Dropzone onPress={() => updateDraft({ photoAdded: true })} />
           <View style={styles.actions}>
-            <CaptureButton label="Take photo" onPress={() => updateDraft({ photoAdded: true })} />
-            <CaptureButton
+            <SecondaryButton
+              label="Take photo"
+              onPress={() => updateDraft({ photoAdded: true })}
+              style={styles.action}
+            />
+            <SecondaryButton
               label="Choose from library"
               onPress={() => updateDraft({ photoAdded: true })}
+              style={styles.action}
             />
           </View>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
-            Optional — a quick snap helps the AI sanity-check the estimate. You can skip this.
+          <ThemedText type="caption" style={styles.hint}>
+            Optional — you can skip this and add one later.
           </ThemedText>
-        </ThemedView>
+        </View>
       )}
     </QuoteStepScreen>
   );
 }
 
-// Large dashed-border target standing in for the eventual camera/library entry.
-function Dropzone({ onPress }: { onPress: () => void }) {
+// Stand-in for the eventual captured image. Hierarchy comes from type, not from
+// an icon — there is no icon set in the app and emoji are off the table.
+function PhotoTile() {
   const theme = useTheme();
+
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => pressed && styles.pressed}>
-      <ThemedView
-        type="backgroundElement"
-        style={[styles.dropzone, { borderColor: theme.backgroundSelected }]}>
-        <ThemedText style={styles.dropzoneGlyph}>📷</ThemedText>
-        <ThemedText type="smallBold">Add a photo of the space</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          Tap to add
-        </ThemedText>
-      </ThemedView>
-    </Pressable>
+    <View style={[styles.tile, { backgroundColor: theme.surface, borderColor: theme.hairline }]}>
+      <ThemedText type="heading">Photo added</ThemedText>
+      <ThemedText type="label">Placeholder — no image captured yet</ThemedText>
+    </View>
   );
 }
 
-// One of the two capture actions. Neutral (non-accent) so neither dominates,
-// matching the rest of the flow's secondary controls.
-function CaptureButton({ label, onPress }: { label: string; onPress: () => void }) {
+// Large dashed target standing in for the camera/library entry. The dashed rule
+// is intentionally 1px rather than hairline: it's a boundary, not a divider,
+// and a dash pattern doesn't resolve at sub-pixel widths.
+function Dropzone({ onPress }: { onPress: () => void }) {
+  const theme = useTheme();
+
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.actionWrapper, pressed && styles.pressed]}>
-      <ThemedView type="backgroundElement" style={styles.action}>
-        <ThemedText type="smallBold" themeColor="textSecondary">
-          {label}
-        </ThemedText>
-      </ThemedView>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.dropzone,
+        { borderColor: theme.hairline },
+        pressed && styles.pressed,
+      ]}>
+      <ThemedText type="heading">Add a photo of the space</ThemedText>
+      <ThemedText type="label">Tap to add</ThemedText>
     </Pressable>
   );
 }
@@ -105,46 +103,31 @@ const styles = StyleSheet.create({
   dropzone: {
     paddingVertical: Spacing.six,
     paddingHorizontal: Spacing.four,
-    borderRadius: Spacing.four,
-    borderWidth: 2,
+    borderRadius: Radius.sheet,
+    borderWidth: 1,
     borderStyle: 'dashed',
     alignItems: 'center',
-    gap: Spacing.one,
+    gap: Spacing.two,
   },
-  dropzoneGlyph: {
-    fontSize: 40,
-    marginBottom: Spacing.one,
+  tile: {
+    paddingVertical: Spacing.six,
+    paddingHorizontal: Spacing.four,
+    borderRadius: Radius.sheet,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    gap: Spacing.two,
   },
   actions: {
     flexDirection: 'row',
     gap: Spacing.two,
   },
-  actionWrapper: {
-    flex: 1,
-  },
   action: {
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.three,
-    alignItems: 'center',
+    flex: 1,
   },
   hint: {
     textAlign: 'center',
   },
-  thumb: {
-    paddingVertical: Spacing.six,
-    borderRadius: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  thumbGlyph: {
-    fontSize: 36,
-    color: Accent,
-  },
-  removeLabel: {
-    textAlign: 'center',
-  },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.6,
   },
 });

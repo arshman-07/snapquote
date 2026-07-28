@@ -1,15 +1,10 @@
-import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { QuoteRow } from '@/components/quote-row';
+import { QuoteList } from '@/components/quote-list';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { CURRENCY_CODE } from '@/constants/quote';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useAllQuotes } from '@/hooks/use-all-quotes';
 
@@ -26,6 +21,7 @@ export default function QuotesScreen() {
       <SafeAreaView style={styles.safeArea}>
         <ScrollView
           contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={quotesQuery.isRefetching}
@@ -33,31 +29,32 @@ export default function QuotesScreen() {
             />
           }>
           <View style={styles.header}>
-            <ThemedText type="subtitle">Quotes</ThemedText>
-            <ThemedText themeColor="textSecondary">
-              Every quote you&apos;ve saved.
-            </ThemedText>
+            <ThemedText type="title">Quotes</ThemedText>
+            <ThemedText themeColor="body">Every quote you&apos;ve saved.</ThemedText>
           </View>
 
-          {quotesQuery.isLoading ? (
-            <View style={styles.listStatus}>
-              <ActivityIndicator />
-            </View>
-          ) : quotesQuery.isError ? (
-            <ThemedText type="small" themeColor="textSecondary">
-              Couldn&apos;t load your quotes — pull down to retry.
-            </ThemedText>
-          ) : quotes.length > 0 ? (
-            <ThemedView type="backgroundElement" style={styles.list}>
-              {quotes.map((quote, index) => (
-                <QuoteRow key={quote.id} quote={quote} first={index === 0} />
-              ))}
-            </ThemedView>
-          ) : (
-            <ThemedText type="small" themeColor="textSecondary">
-              No quotes yet — start one from the Home tab.
-            </ThemedText>
-          )}
+          <View style={styles.section}>
+            {quotes.length > 0 && (
+              <View style={styles.sectionHeader}>
+                <ThemedText type="label">All quotes</ThemedText>
+                <ThemedText type="label">{CURRENCY_CODE}</ThemedText>
+              </View>
+            )}
+
+            {quotesQuery.isLoading ? (
+              <View style={styles.listStatus}>
+                <ActivityIndicator />
+              </View>
+            ) : quotesQuery.isError ? (
+              <ThemedText type="caption">
+                Couldn&apos;t load your quotes — pull down to retry.
+              </ThemedText>
+            ) : quotes.length > 0 ? (
+              <QuoteList quotes={quotes} />
+            ) : (
+              <ThemedText type="caption">No quotes yet — start one from the Home tab.</ThemedText>
+            )}
+          </View>
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -79,14 +76,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.four,
     paddingBottom: BottomTabInset + Spacing.four,
-    gap: Spacing.four,
+    gap: Spacing.five,
   },
   header: {
-    gap: Spacing.one,
+    gap: Spacing.two,
   },
-  list: {
-    borderRadius: Spacing.four,
-    paddingHorizontal: Spacing.four,
+  section: {
+    gap: Spacing.two,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: Spacing.one,
   },
   listStatus: {
     paddingVertical: Spacing.three,

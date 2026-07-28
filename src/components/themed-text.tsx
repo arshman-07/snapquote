@@ -1,28 +1,70 @@
-import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
+import { StyleSheet, Text, type TextProps } from 'react-native';
 
 import { Fonts, ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
+/**
+ * The type scale is deliberately sparse. Six stops with distinct jobs beats a
+ * stack of 17/15/14/13 that all read the same — hierarchy here comes from big
+ * jumps in size and weight, not from nudging a few points.
+ *
+ * display  34  hero numbers only (a grand total, a headline figure)
+ * title    28  screen titles
+ * heading  20  section headings that need real presence
+ * body     17  reading copy (iOS body size)
+ * caption  13  hints, inline errors, secondary detail
+ * label    11  uppercase micro-labels: section headers, metadata, timestamps
+ */
+export type TextType =
+  | 'display'
+  | 'title'
+  | 'heading'
+  | 'body'
+  | 'bodyBold'
+  | 'caption'
+  | 'label'
+  | 'link'
+  | 'code';
+
 export type ThemedTextProps = TextProps & {
-  type?: 'default' | 'title' | 'small' | 'smallBold' | 'subtitle' | 'link' | 'linkPrimary' | 'code';
+  type?: TextType;
   themeColor?: ThemeColor;
+  /**
+   * Tabular figures. Required on every monetary value so digits occupy equal
+   * width and totals line up in a column.
+   */
+  tabular?: boolean;
 };
 
-export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
+// Each stop carries a sensible default colour so the palette is applied
+// consistently without every call site restating it. `themeColor` overrides.
+const defaultColor: Record<TextType, ThemeColor> = {
+  display: 'ink',
+  title: 'ink',
+  heading: 'ink',
+  body: 'ink',
+  bodyBold: 'ink',
+  caption: 'body',
+  label: 'muted',
+  link: 'ink',
+  code: 'body',
+};
+
+export function ThemedText({
+  style,
+  type = 'body',
+  themeColor,
+  tabular,
+  ...rest
+}: ThemedTextProps) {
   const theme = useTheme();
 
   return (
     <Text
       style={[
-        { color: theme[themeColor ?? 'text'] },
-        type === 'default' && styles.default,
-        type === 'title' && styles.title,
-        type === 'small' && styles.small,
-        type === 'smallBold' && styles.smallBold,
-        type === 'subtitle' && styles.subtitle,
-        type === 'link' && styles.link,
-        type === 'linkPrimary' && styles.linkPrimary,
-        type === 'code' && styles.code,
+        { color: theme[themeColor ?? defaultColor[type]] },
+        styles[type],
+        tabular && styles.tabular,
         style,
       ]}
       {...rest}
@@ -31,43 +73,58 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
 }
 
 const styles = StyleSheet.create({
-  small: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 500,
-  },
-  smallBold: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 700,
-  },
-  default: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: 500,
+  display: {
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: '700',
+    letterSpacing: -0.5,
   },
   title: {
-    fontSize: 48,
-    fontWeight: 600,
-    lineHeight: 52,
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '700',
+    letterSpacing: -0.4,
   },
-  subtitle: {
-    fontSize: 32,
-    lineHeight: 44,
-    fontWeight: 600,
+  heading: {
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  body: {
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '400',
+  },
+  bodyBold: {
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '600',
+  },
+  caption: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '400',
+  },
+  label: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '600',
+    // ~0.08em at 11px.
+    letterSpacing: 0.9,
+    textTransform: 'uppercase',
   },
   link: {
-    lineHeight: 30,
-    fontSize: 14,
-  },
-  linkPrimary: {
-    lineHeight: 30,
-    fontSize: 14,
-    color: '#3c87f7',
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '600',
   },
   code: {
     fontFamily: Fonts.mono,
-    fontWeight: Platform.select({ android: 700 }) ?? 500,
-    fontSize: 12,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  tabular: {
+    fontVariant: ['tabular-nums'],
   },
 });

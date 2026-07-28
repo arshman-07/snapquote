@@ -38,7 +38,13 @@ function isAuthError(error: unknown): boolean {
 // expected credential errors never reach here — only failures on the app's
 // authenticated data requests do.
 function handleAuthError(error: unknown): void {
-  if (isAuthError(error)) onSessionExpired?.();
+  if (!isAuthError(error)) return;
+  // Dev-only: this is the one place the mid-session dead-session bounce is
+  // decided, and the visible result (landing on /login) is identical to the
+  // foreground re-validation path in the auth context. Logging here is what
+  // distinguishes them when testing.
+  if (__DEV__) console.warn('[auth] session expired mid-session → signing out', error);
+  onSessionExpired?.();
 }
 
 // Shared TanStack Query client for the whole app. Reference data (like
