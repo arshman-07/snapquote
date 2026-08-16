@@ -318,8 +318,15 @@ which resolved OQ #1/#2 and reshaped this task:
       session row deleted from `directus_sessions`; TTL restored afterwards. The
       SDK mechanism behind it was corrected in the checklist item above (stale
       expired token re-sent → 401, not a propagated refresh error).
+      **2026-08-16:** offline behaviour behind the gate closed out (OQ #7). All
+      four below-the-gate fallbacks verified on-device with Directus stopped, and
+      the gate above them fixed: a launch refresh that fails for **network**
+      reasons now keeps the refresh token and flags `offlineSession`, so the
+      login screen offers a one-tap **Try again** instead of a password form that
+      cannot succeed. A server rejection still discards the token and shows the
+      plain form. Mechanism and the confirmed SDK behaviour in SECURITY.md §2.3.
       **Remaining for the task:** decide email verification (needs a mail
-      transport); stop the emptied v12 service; verify offline fallbacks behind
-      the gate (OQ #7); and payload/value validation (SECURITY.md §2.5). Session
-      invalidation on password change was checked the same day and needs no work
-      (SECURITY.md §2.3).
+      transport) and payload/value validation (SECURITY.md §2.5). Stopping the
+      emptied v12 service was **deferred by the maintainer on 2026-08-16** — it
+      stays running for now; SECURITY.md §0 remains open. Session invalidation on
+      password change was checked 2026-07-27 and needs no work (SECURITY.md §2.3).

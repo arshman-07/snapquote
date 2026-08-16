@@ -77,11 +77,15 @@ Two audiences, one flow, tailored by a **contractor / homeowner choice at sign-u
   [tasks/auth.md](./tasks/auth.md)). **Quotes are nameable, editable and deletable**
   (2026-07-27). Permission suite green at 55/55 with per-field and cross-user item-read
   coverage ([SECURITY.md](./SECURITY.md) §3.1).
-  **Remaining before Phase 2 closes:** stop the emptied v12 service on `:8055` (still
-  accepting registrations — oldest open item); decide email verification; server-side
-  payload validation (§2.5); offline fallbacks behind the gate (OQ #7); and **run the
-  2026-07-27 UI work on a device — none of it has been** (see FRONTEND.md “Verification
-  state”).
+  **Offline behaviour behind the gate closed 2026-08-16** (OQ #7): the fallbacks were
+  verified on-device and a cold launch with no server now explains itself instead of
+  showing a login form that can't succeed.
+  **Remaining before Phase 2 closes:** decide email verification; server-side payload
+  validation (§2.5); and device-verify the rest of the 2026-07-27 UI work — the new-quote
+  wizard was exercised on 08-16, but **quote editing, deletion and the flow-exit ✕ still
+  have not run** (see FRONTEND.md “Verification state”). The emptied v12 service on `:8055`
+  is **staying up by decision (2026-08-16)**, so SECURITY.md §0 stays open rather than
+  blocking the phase.
 - [ ] Deferred: **branding pass** — app icon, splash, favicon, tab icon and `app.json`
   `slug`/`scheme` are all still Expo starter defaults
 - [ ] Phase 3: AI estimation

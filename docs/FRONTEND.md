@@ -117,6 +117,26 @@ than re-implemented per screen.
 
 ## Decisions log
 
+- **2026-08-16:** **A cold launch with no server explains itself instead of demanding a
+  password** (OPEN-QUESTIONS #7). The four offline fallbacks below the gate were fine; the
+  gate above them wasn't. `directus.refresh()` failing on launch gated to `signedOut`, which
+  dropped the user on a login form that cannot succeed while the server is unreachable — so
+  the fallbacks were unreachable from a cold start, the one case they were written for.
+  - `auth.tsx` now records **why** restore failed, not just that it did: `offlineSession` is
+    true only for a network failure with a refresh token still on the device. A server
+    rejection leaves it false — that user really is signed out. The gate logic is unchanged.
+  - The login screen shows a **"You're offline"** card in that state, with a **Try again**
+    that re-runs the restore. A stored refresh token is a working credential; making someone
+    type a password to use a token we already hold is busywork. `restoreSession` returns
+    whether the session came back so a still-failing retry can say so rather than looking
+    inert.
+  - Styled as a neutral `surface` card, **not** an error — nothing has gone wrong. Retry is a
+    `SecondaryButton` so "Sign in" stays the screen's single filled action.
+  - The unmount guard moved from a per-effect `cancelled` local to a `mountedRef`, since
+    restore is now callable twice (launch + retry). Reset on mount so a Fast Refresh remount
+    doesn't leave it stuck false.
+  - **Confirmed on-device:** the Directus SDK leaves the refresh token in SecureStore after a
+    failed refresh. The whole feature depended on that and it wasn't knowable from the code.
 - **2026-07-27:** **Quotes are deletable in-app** — reverses the earlier "no delete" position
   (SECURITY.md). Lives in the quote actions dialog, below a divider with editing, ordered by
   consequence: edit (reversible) above delete (not). Always behind a destructive `Alert` that
@@ -278,17 +298,25 @@ than re-implemented per screen.
 - [x] **Design system pass across every screen** (2026-07-27) — see the section above
 - [x] **Quotes are nameable, editable and deletable** (2026-07-27)
 - [x] Quote flow can be exited early with a discard confirm (2026-07-27)
+- [x] **Offline cold launch explains itself on the login screen** (2026-08-16, device-verified)
 
-### ⚠️ Verification state (2026-07-27)
+### ⚠️ Verification state (updated 2026-08-16)
 
-Everything dated 2026-07-27 — the whole design pass, `customer_name`, quote editing,
-quote deletion, and the flow-exit control — is **verified by typecheck, lint, web
-bundle, and direct API probing only. None of it has been run on a device or in a
-browser.** A clean `expo export` proves no import or top-level render crash across all
-20 routes; it says nothing about layout, touch targets, keyboard behaviour, or whether
-any of it looks right.
+**Device-verified 2026-08-16** (14-step run with Directus stopped and restarted on the
+devbox — not airplane mode, which prevents a dev build from fetching its bundle at all):
 
-Highest-risk untested areas, in order:
+- The offline notice, its Try-again while still offline, and Try-again after reconnecting
+  signing straight in without a password.
+- Sign-out → plain login form with no notice, including after a relaunch with the server
+  down (a cleared token is a signed-out user, not an offline one).
+- Wrong-password error unchanged.
+- The **new-quote wizard end to end** — Dimensions → Labour → Summary → Done → save — with
+  both offline fallbacks showing and the save-failure alert retrying successfully once the
+  server came back. This is the first time the 2026-07-27 design pass has been seen
+  rendered on a device.
+- Home's error note and pull-to-refresh.
+
+**Still unverified from 2026-07-27** — typecheck, lint and `expo export` only:
 
 1. **Edit-flow hydration** (`(quote)/_layout.tsx`) — latches the quote id from
    `useGlobalSearchParams` because later steps carry no params. Reasoned through, never
@@ -297,10 +325,10 @@ Highest-risk untested areas, in order:
    iOS; the keyboard may cover the buttons.
 3. **The close ✕ control** — positioned with negative margins to sit inside the header
    padding; easy to get wrong against a real safe-area inset.
-4. **The visual design pass as a whole** — never seen rendered.
+4. **The Quotes tab** — not opened during the 08-16 run.
 
-Suggested smoke test: create a quote end-to-end; tap a saved quote → edit → change a
-dimension → Save changes; tap → delete. That exercises everything above.
+Remaining smoke test for those: tap a saved quote → edit → change a dimension → Save
+changes; tap → delete; and exit a wizard part-way via ✕.
 
 ### Known open UI items
 
@@ -310,4 +338,9 @@ dimension → Save changes; tap → delete. That exercises everything above.
 - **App identity is still Expo's** — icon, splash, favicon, the Quotes tab icon, and
   `app.json` `slug`/`scheme` (`"mobile"`). A branding pass was explicitly deferred.
 - **Sign-out button overlaps the web tab bar** (web only; fine on native).
-- Offline fallbacks behind the auth gate are untested (OPEN-QUESTIONS #7).
+- **`npx tsc --noEmit` fails with 6 errors in `src/components/app-tabs.tsx`** (found
+  2026-08-16, pre-existing — reproduced on a clean `85e442e` tree). `NativeTabs.Trigger.Label`
+  and `.Icon` don't exist on the installed `expo-router@6.0.24` types, which expose only
+  `.TabBar` on `Trigger`. Native tabs render fine on-device, so this is a types/API-shape
+  mismatch rather than a runtime break — but it means "typecheck is clean" can no longer be
+  used as a green light. Untouched so far; needs the SDK 54 native-tabs docs.

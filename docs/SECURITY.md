@@ -269,6 +269,19 @@ Rejected alternatives:
   (`src/lib/auth-storage.ts`; web falls back to localStorage — dev target only.)
 - ✅ **Auto-refresh on launch**; failed refresh → back to the login gate.
   Confirmed on-device 2026-07-26 (deleted account → relaunch → `/login`).
+- ✅ **A failed launch refresh distinguishes "dead token" from "no server"**
+  (2026-08-16). Both still gate to `signedOut` — without an access token there is
+  nothing to fetch either way — but only a **server rejection** discards the
+  stored refresh token. A network failure keeps it and sets `offlineSession`, so
+  the login screen can offer a one-tap retry instead of demanding a password.
+  **Verified on-device** by stopping the Directus container: the refresh token
+  survives a failed refresh in SecureStore (the SDK does not clear storage on a
+  network error), and retrying after restarting the container restored the
+  session with no credentials typed.
+  Security-relevant properties, both confirmed: the gate itself is **unchanged**
+  — being offline never admits anyone to `(tabs)`/`(quote)` — and an explicit
+  **sign-out clears the flag along with the token**, so a signed-out user offline
+  gets a plain login form and no suggestion that a session is recoverable.
 - ✅ **Mid-session dead session → login.** Verified on-device **2026-07-27**:
   with `ACCESS_TOKEN_TTL=60s` and the user's `directus_sessions` row deleted, a
   foregrounded pull-to-refresh bounced to `/login`. Note the bounce is

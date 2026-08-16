@@ -47,9 +47,19 @@ decisions into the relevant task docs.
    empty (and was missing the `date_created` column), which broke the recent-
    quotes list until both were fixed 2026-07-21. See `directus-11-downgrade.md`.
 
-7. **Offline behaviour once authed.** Today's offline fallbacks (static chips/rates,
-   finish-without-saving) — keep as-is behind the login gate? (Recommended: yes,
-   nothing changes below the gate.)
+7. **Offline behaviour once authed.** ✅ **Answered 2026-08-16: keep the fallbacks
+   as-is, and fix the gate above them.** All four below-the-gate fallbacks were
+   verified on-device with Directus stopped — default room chips, default rate
+   chips, the save-failure alert (Retry / Finish without saving) and its
+   successful retry after reconnecting, and the quote lists' error note. Nothing
+   below the gate needed changing.
+   The gate *above* them was the real gap: a cold launch with no server put the
+   user on a login form that cannot succeed offline, making every fallback
+   unreachable from a cold start — the exact situation they exist for. Closed by
+   the offline notice on the login screen (FRONTEND.md decisions log,
+   SECURITY.md §2.3). **Not** solved: an offline cold start still can't reach the
+   app, because there's no persisted query cache to show. That's offline-first
+   mode — deliberately out of scope, see FUTURE.md.
 
 ### Carried-over product questions from Phase 1/2 task docs
 

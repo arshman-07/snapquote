@@ -7,6 +7,33 @@ ready to be worked.
 
 ---
 
+## Offline-first mode (usable with no signal)
+
+**Idea:** let a signed-in user cold-launch the app with no connectivity and still
+see their quotes and build a new one, syncing when the connection returns.
+
+Deliberately **not** built while closing OPEN-QUESTIONS #7 (2026-08-16). That
+work went as far as being honest about the limitation — a cold launch with no
+server now says "You're offline" and offers a one-tap retry — but it still can't
+let anyone in. Two things are missing, and neither is small:
+
+1. **A persisted query cache** (e.g. `@tanstack/query-async-storage-persister`),
+   so a cold start has last-seen quotes to render. Today the TanStack cache is
+   memory-only and `signIn` clears it, so admitting an offline user would show an
+   empty, broken app — worse than the notice.
+2. **A write queue** for quotes created offline, replayed on reconnect. Today the
+   Summary step's only offline option is "Finish without saving".
+
+**Security note:** (1) means quote data at rest on the device, which today it
+never is — only the refresh token is persisted. That needs a decision in
+SECURITY.md before it's built, not after.
+
+**Trigger to schedule this:** evidence that contractors are actually quoting in
+basements/new-builds with no signal. It's a real scenario for the contractor
+audience and a non-issue for homeowners, so it likely follows real usage data.
+
+---
+
 ## Job-type components (selectable scopes per job type)
 
 **Idea:** each job type exposes a checklist of the things that can be part of

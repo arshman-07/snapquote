@@ -37,6 +37,21 @@ type AuthStatus = 'restoring' | 'signedIn' | 'signedOut';
 
 type AuthContextValue = {
   status: AuthStatus;
+  /**
+   * True when the last restore attempt failed for network reasons while a
+   * refresh token is still on the device — i.e. "you have a session here, you
+   * just can't reach the server". The login screen uses this to explain the
+   * situation instead of demanding credentials that can't be checked offline.
+   * A server rejection (dead token) leaves this false: that really is a
+   * signed-out user.
+   */
+  offlineSession: boolean;
+  /**
+   * Re-run the launch restore — lets a reconnected user back in without typing.
+   * Resolves true when the session came back, so the caller can report a
+   * still-failing retry.
+   */
+  retryRestore: () => Promise<boolean>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (input: SignUpInput) => Promise<void>;
   signOut: () => Promise<void>;
@@ -53,44 +68,68 @@ function isServerRejection(error: unknown): boolean {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('restoring');
+  const [offlineSession, setOfflineSession] = useState(false);
 
-  // Session restore on launch. The SDK never refreshes by itself from a cold
-  // start (no expires_at in storage), so we do it explicitly here.
+  // Guards against setting state after unmount. A ref rather than a per-effect
+  // `cancelled` local because restore is now callable twice over — once on
+  // launch, and again from the login screen's Try again. Reset on mount so a
+  // Strict Mode / Fast Refresh remount doesn't leave it stuck false.
+  const mountedRef = useRef(true);
   useEffect(() => {
-    let cancelled = false;
-
-    async function restore() {
-      // No persisted refresh token (fresh install / after logout): skip the
-      // doomed network round-trip.
-      const stored = await authStorage.get();
-      if (!stored?.refresh_token) {
-        if (!cancelled) setStatus('signedOut');
-        return;
-      }
-
-      try {
-        await directus.refresh();
-        if (!cancelled) setStatus('signedIn');
-      } catch (error) {
-        // Server said no → token is dead, drop it. Network failure → keep the
-        // token so the next launch can retry, but still gate to login (we
-        // can't make authenticated requests without an access token anyway).
-        if (isServerRejection(error)) await authStorage.set(null);
-        if (!cancelled) setStatus('signedOut');
-      }
-    }
-
-    restore();
+    mountedRef.current = true;
     return () => {
-      cancelled = true;
+      mountedRef.current = false;
     };
   }, []);
+
+  // Session restore. The SDK never refreshes by itself from a cold start (no
+  // expires_at in storage), so we do it explicitly.
+  const restoreSession = useCallback(async (): Promise<boolean> => {
+    // No persisted refresh token (fresh install / after logout): skip the
+    // doomed network round-trip.
+    const stored = await authStorage.get();
+    if (!stored?.refresh_token) {
+      if (mountedRef.current) {
+        setOfflineSession(false);
+        setStatus('signedOut');
+      }
+      return false;
+    }
+
+    try {
+      await directus.refresh();
+      if (mountedRef.current) {
+        setOfflineSession(false);
+        setStatus('signedIn');
+      }
+      return true;
+    } catch (error) {
+      // Server said no → token is dead, drop it. Network failure → keep the
+      // token so a retry (or the next launch) can use it, but still gate to
+      // login: without an access token there's nothing we could fetch anyway.
+      const rejected = isServerRejection(error);
+      if (rejected) await authStorage.set(null);
+      if (mountedRef.current) {
+        // Only a network failure means "offline with a live session"; a
+        // rejection just means signed out.
+        setOfflineSession(!rejected);
+        setStatus('signedOut');
+      }
+      return false;
+    }
+  }, []);
+
+  // Launch restore. The root layout holds the splash until this resolves.
+  useEffect(() => {
+    void restoreSession();
+  }, [restoreSession]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     // Throws on bad credentials — the login screen catches and displays it.
     await directus.login({ email, password });
     // Anything fetched anonymously (or by a previous user) is stale now.
     queryClient.clear();
+    setOfflineSession(false);
     setStatus('signedIn');
   }, []);
 
@@ -124,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Nothing has been fetched under this identity yet, but clear for parity
     // with signIn (drops anything cached anonymously).
     queryClient.clear();
+    setOfflineSession(false);
     setStatus('signedIn');
   }, []);
 
@@ -137,6 +177,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       await authStorage.set(null);
       queryClient.clear();
+      // An explicit sign-out is not an offline session — the token is gone, so
+      // the login screen should show its plain form even if we're offline.
+      setOfflineSession(false);
       setStatus('signedOut');
     }
   }, []);
@@ -178,8 +221,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [status, signOut]);
 
   const value = useMemo(
-    () => ({ status, signIn, signUp, signOut }),
-    [status, signIn, signUp, signOut],
+    () => ({ status, offlineSession, retryRestore: restoreSession, signIn, signUp, signOut }),
+    [status, offlineSession, restoreSession, signIn, signUp, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
