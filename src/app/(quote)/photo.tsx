@@ -1,21 +1,27 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Camera, ImageIcon } from 'lucide-react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { SecondaryButton, TextButton } from '@/components/button';
+import { Key, SecondaryButton, TextButton } from '@/components/button';
+import { Led } from '@/components/led';
 import { QuoteStepScreen } from '@/components/quote-step-screen';
+import { Readout, ReadoutText } from '@/components/readout';
 import { StepFooter } from '@/components/step-footer';
 import { ThemedText } from '@/components/themed-text';
-import { Radius, Spacing } from '@/constants/theme';
+import { Radius, ScreenColors, Spacing } from '@/constants/theme';
 import { useQuoteDraft } from '@/context/quote-draft';
 import { useTheme } from '@/hooks/use-theme';
 
 // Step 2 — Photo capture. Optional. In Phase 1 there's no real camera/library
 // access (that arrives in Phase 3 with expo-image-picker), so "Take photo" and
-// "Choose from library" just record that a photo was added on the draft. The
-// layout telegraphs the eventual capture UX so it won't change when wired up.
+// "Library" (shortened from "Choose from library" — uppercase key legends
+// wrapped at half width) just record that a photo was added on the draft. The
+// layout telegraphs the eventual capture UX so it won't change when wired up:
+// the screen is a camera viewfinder, which later shows the real image.
 export default function PhotoScreen() {
   const router = useRouter();
   const { draft, updateDraft } = useQuoteDraft();
+  const theme = useTheme();
 
   return (
     <QuoteStepScreen
@@ -31,16 +37,34 @@ export default function PhotoScreen() {
         />
       }>
       {draft.photoAdded ? (
-        // Added state — a placeholder tile (no real image yet) plus a way to
-        // remove it. Phase 3 swaps the tile for the actual captured photo.
+        // Added state — the viewfinder reports a captured frame (no real image
+        // yet) plus a way to remove it. Phase 3 shows the actual photo here.
         <View style={styles.section}>
-          <PhotoTile />
+          <Readout minHeight={200}>
+            <View style={styles.centre}>
+              <Led tone="success" size={10} />
+              <ReadoutText variant="label">Photo added</ReadoutText>
+              <ReadoutText>Placeholder — no image captured yet</ReadoutText>
+            </View>
+          </Readout>
           <TextButton label="Remove photo" onPress={() => updateDraft({ photoAdded: false })} />
         </View>
       ) : (
-        // Empty state — a tappable dropzone and the two capture entry points.
+        // Empty state — the whole viewfinder is a key (it sinks when pressed),
+        // plus the two explicit capture entry points below it.
         <View style={styles.section}>
-          <Dropzone onPress={() => updateDraft({ photoAdded: true })} />
+          <Key
+            variant="ghost"
+            onPress={() => updateDraft({ photoAdded: true })}
+            accessibilityLabel="Add a photo of the space"
+            faceStyle={styles.viewfinderKey}>
+            <Readout minHeight={200}>
+              <View style={styles.centre}>
+                <Camera size={32} strokeWidth={1.5} color={ScreenColors.text} />
+                <ReadoutText variant="label">No photo · tap to add</ReadoutText>
+              </View>
+            </Readout>
+          </Key>
           <View style={styles.actions}>
             <SecondaryButton
               label="Take photo"
@@ -48,86 +72,44 @@ export default function PhotoScreen() {
               style={styles.action}
             />
             <SecondaryButton
-              label="Choose from library"
+              label="Library"
               onPress={() => updateDraft({ photoAdded: true })}
               style={styles.action}
             />
           </View>
-          <ThemedText type="caption" style={styles.hint}>
-            Optional — you can skip this and add one later.
-          </ThemedText>
+          <View style={styles.hintRow}>
+            <ImageIcon size={16} strokeWidth={1.5} color={theme.muted} />
+            <ThemedText type="caption">Optional — you can skip this and add one later.</ThemedText>
+          </View>
         </View>
       )}
     </QuoteStepScreen>
   );
 }
 
-// Stand-in for the eventual captured image. Hierarchy comes from type, not from
-// an icon — there is no icon set in the app and emoji are off the table.
-function PhotoTile() {
-  const theme = useTheme();
-
-  return (
-    <View style={[styles.tile, { backgroundColor: theme.surface, borderColor: theme.hairline }]}>
-      <ThemedText type="heading">Photo added</ThemedText>
-      <ThemedText type="label">Placeholder — no image captured yet</ThemedText>
-    </View>
-  );
-}
-
-// Large dashed target standing in for the camera/library entry. The dashed rule
-// is intentionally 1px rather than hairline: it's a boundary, not a divider,
-// and a dash pattern doesn't resolve at sub-pixel widths.
-function Dropzone({ onPress }: { onPress: () => void }) {
-  const theme = useTheme();
-
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      style={({ pressed }) => [
-        styles.dropzone,
-        { borderColor: theme.hairline },
-        pressed && styles.pressed,
-      ]}>
-      <ThemedText type="heading">Add a photo of the space</ThemedText>
-      <ThemedText type="label">Tap to add</ThemedText>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   section: {
-    gap: Spacing.three,
+    gap: Spacing.four,
   },
-  dropzone: {
-    paddingVertical: Spacing.six,
-    paddingHorizontal: Spacing.four,
-    borderRadius: Radius.sheet,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    gap: Spacing.two,
+  viewfinderKey: {
+    alignItems: 'stretch',
+    borderRadius: Radius.lg,
   },
-  tile: {
-    paddingVertical: Spacing.six,
-    paddingHorizontal: Spacing.four,
-    borderRadius: Radius.sheet,
-    borderWidth: StyleSheet.hairlineWidth,
+  centre: {
     alignItems: 'center',
     gap: Spacing.two,
   },
   actions: {
     flexDirection: 'row',
-    gap: Spacing.two,
+    gap: Spacing.three,
   },
   action: {
     flex: 1,
   },
-  hint: {
-    textAlign: 'center',
-  },
-  pressed: {
-    opacity: 0.6,
+  hintRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: Spacing.two,
   },
 });

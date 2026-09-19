@@ -4,10 +4,15 @@ import { Dimensions, StyleSheet, View } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { useTheme } from '@/hooks/use-theme';
+
 const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
 const DURATION = 600;
 
+// Launch overlay: a sheet of chassis-coloured plastic that fades away to reveal
+// the app, so the hand-off from the native splash is seamless in either mode.
 export function AnimatedSplashOverlay() {
+  const theme = useTheme();
   const [visible, setVisible] = useState(true);
 
   if (!visible) return null;
@@ -39,7 +44,7 @@ export function AnimatedSplashOverlay() {
           scheduleOnRN(setVisible, false);
         }
       })}
-      style={styles.backgroundSolidColor}
+      style={[styles.backgroundSolidColor, { backgroundColor: theme.background }]}
     />
   );
 }
@@ -126,7 +131,6 @@ const styles = StyleSheet.create({
   },
   backgroundSolidColor: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
     zIndex: 1000,
   },
 });

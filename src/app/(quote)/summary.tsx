@@ -1,13 +1,17 @@
 import { useRouter } from 'expo-router';
-import { Alert, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, Switch, View } from 'react-native';
 
 import { Divider } from '@/components/divider';
+import { Field } from '@/components/field';
+import { Led } from '@/components/led';
+import { Panel } from '@/components/panel';
 import { QuoteStepScreen } from '@/components/quote-step-screen';
+import { Readout, ReadoutText } from '@/components/readout';
 import { StepFooter } from '@/components/step-footer';
 import { ThemedText } from '@/components/themed-text';
 import { CURRENCY_CODE, formatAmount } from '@/constants/quote';
 import { type MaterialLineItem } from '@/constants/materials-mock';
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import {
   getArea,
   getLabourTotal,
@@ -27,9 +31,10 @@ import { buildQuotePayload } from '@/lib/quote-payload';
 // numbers. Done persists the quote to Directus (as a draft unless "Mark as
 // final" is on), then clears the local draft and returns home.
 //
-// Typography carries this screen: 11px labels against a 34px total, with every
-// figure bare and tabular. The currency is declared once, in the breakdown
-// header, so no line repeats a "$".
+// The breakdown is a printed receipt: one vented panel, grooves between its
+// sections, every figure bare and in mono, and the grand total lit on a readout
+// screen at the bottom. The currency is declared once, in the receipt header,
+// so no line repeats a "$".
 export default function SummaryScreen() {
   const router = useRouter();
   const { draft, updateDraft, reset, editingId } = useQuoteDraft();
@@ -109,23 +114,16 @@ export default function SummaryScreen() {
       {/* Optional label for the quote. Left blank, the lists fall back to the
           room type — so this never blocks finishing, and it can equally be set
           later by tapping the quote in Home or the Quotes tab. */}
-      <View style={styles.nameSection}>
-        <ThemedText type="label">Name this quote (optional)</ThemedText>
-        <TextInput
-          value={draft.customerName}
-          onChangeText={(customerName) => updateDraft({ customerName })}
-          placeholder={draft.jobType ? `e.g. Mrs Patel — ${draft.jobType}` : 'e.g. Mrs Patel'}
-          placeholderTextColor={theme.muted}
-          autoCapitalize="words"
-          maxLength={120}
-          style={[
-            styles.nameInput,
-            { color: theme.ink, backgroundColor: theme.surface, borderColor: theme.hairline },
-          ]}
-        />
-      </View>
+      <Field
+        label="Name this quote (optional)"
+        value={draft.customerName}
+        onChangeText={(customerName) => updateDraft({ customerName })}
+        placeholder={draft.jobType ? `e.g. Mrs Patel — ${draft.jobType}` : 'e.g. Mrs Patel'}
+        autoCapitalize="words"
+        maxLength={120}
+      />
 
-      <View style={styles.breakdown}>
+      <Panel vents style={styles.breakdown}>
         {/* Currency is declared here, once, for every figure below. */}
         <View style={styles.breakdownHeader}>
           <ThemedText type="label">{recap || 'Breakdown'}</ThemedText>
@@ -163,30 +161,33 @@ export default function SummaryScreen() {
 
         <Divider />
 
-        {/* Grand total. No "Total" label — it's the largest figure on the screen,
-            sitting alone below a rule after two subtotals. Naming it would be
-            restating what the hierarchy already says. */}
-        <View style={styles.total}>
-          <ThemedText type="display" tabular>
+        {/* Grand total, lit on the receipt's readout. Bare figure — the USD
+            in the receipt header covers it. */}
+        <Readout minHeight={96}>
+          <ReadoutText variant="label">Estimate · {CURRENCY_CODE}</ReadoutText>
+          <ReadoutText variant="figure" numberOfLines={1} adjustsFontSizeToFit>
             {formatAmount(total)}
-          </ThemedText>
-        </View>
-      </View>
+          </ReadoutText>
+        </Readout>
+      </Panel>
 
       {/* Save-as toggle — quotes stay drafts unless the user calls this one done.
-          The switch tracks `ink`, not the accent: the progress bar above is
-          already this screen's one accent element. */}
+          A status LED states what will be saved (amber draft / green final), in
+          words as well as light. The switch is an interactive toggle, so it
+          takes the accent when on. */}
       <View style={styles.finalRow}>
         <View style={styles.finalLabel}>
           <ThemedText type="bodyBold">Mark as final</ThemedText>
-          <ThemedText type="caption">
-            {draft.status === 'final' ? 'Saved as a final quote' : 'Saved as a draft'}
-          </ThemedText>
+          <Led
+            tone={draft.status === 'final' ? 'success' : 'warning'}
+            label={draft.status === 'final' ? 'Saves as final' : 'Saves as draft'}
+          />
         </View>
         <Switch
           value={draft.status === 'final'}
           onValueChange={(final) => updateDraft({ status: final ? 'final' : 'draft' })}
-          trackColor={{ true: theme.ink, false: theme.hairline }}
+          trackColor={{ true: theme.accent, false: theme.recessed }}
+          ios_backgroundColor={theme.recessed}
         />
       </View>
 
@@ -240,18 +241,10 @@ function formatDate(iso: string): string {
 }
 
 const styles = StyleSheet.create({
-  nameSection: {
-    gap: Spacing.two,
-  },
-  nameInput: {
-    height: 50,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Radius.control,
-    borderWidth: StyleSheet.hairlineWidth,
-    fontSize: 17,
-  },
   breakdown: {
     gap: Spacing.three,
+    // Clear the vent slots in the top-right corner.
+    paddingTop: Spacing.five + Spacing.two,
   },
   breakdownHeader: {
     flexDirection: 'row',
@@ -281,10 +274,6 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: Spacing.one,
   },
-  total: {
-    alignItems: 'flex-end',
-    paddingTop: Spacing.one,
-  },
   finalRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -292,7 +281,7 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   finalLabel: {
-    gap: Spacing.one,
+    gap: Spacing.two,
     flex: 1,
   },
   disclaimer: {

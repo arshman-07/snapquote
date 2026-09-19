@@ -1,17 +1,15 @@
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { QuoteList } from '@/components/quote-list';
+import { QuoteListPanel } from '@/components/quote-list';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { CURRENCY_CODE } from '@/constants/quote';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useAllQuotes } from '@/hooks/use-all-quotes';
 
 // Quotes tab — the full history of saved quotes, newest first (Home shows only
-// the five most recent). Same row + data shape as Home; the list just isn't
-// capped. Loading / error / empty states mirror Home, and pull-to-refresh
-// refetches. No mock fallback: an error says so rather than inventing history.
+// the five most recent). Same panel, rows and states as Home via
+// `QuoteListPanel`; the list just isn't capped. Pull down to refetch.
 export default function QuotesScreen() {
   const quotesQuery = useAllQuotes();
   const quotes = quotesQuery.data ?? [];
@@ -33,28 +31,14 @@ export default function QuotesScreen() {
             <ThemedText themeColor="body">Every quote you&apos;ve saved.</ThemedText>
           </View>
 
-          <View style={styles.section}>
-            {quotes.length > 0 && (
-              <View style={styles.sectionHeader}>
-                <ThemedText type="label">All quotes</ThemedText>
-                <ThemedText type="label">{CURRENCY_CODE}</ThemedText>
-              </View>
-            )}
-
-            {quotesQuery.isLoading ? (
-              <View style={styles.listStatus}>
-                <ActivityIndicator />
-              </View>
-            ) : quotesQuery.isError ? (
-              <ThemedText type="caption">
-                Couldn&apos;t load your quotes — pull down to retry.
-              </ThemedText>
-            ) : quotes.length > 0 ? (
-              <QuoteList quotes={quotes} />
-            ) : (
-              <ThemedText type="caption">No quotes yet — start one from the Home tab.</ThemedText>
-            )}
-          </View>
+          <QuoteListPanel
+            label="All quotes"
+            quotes={quotes}
+            isLoading={quotesQuery.isLoading}
+            isError={quotesQuery.isError}
+            errorText="Couldn't load your quotes — pull down to retry."
+            emptyText="No quotes yet — start one from the Home tab."
+          />
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -75,23 +59,10 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.four,
+    paddingBottom: BottomTabInset + Spacing.five,
     gap: Spacing.five,
   },
   header: {
     gap: Spacing.two,
-  },
-  section: {
-    gap: Spacing.two,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingBottom: Spacing.one,
-  },
-  listStatus: {
-    paddingVertical: Spacing.three,
-    alignItems: 'flex-start',
   },
 });

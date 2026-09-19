@@ -1,19 +1,12 @@
 import { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { PrimaryButton, SecondaryButton, TextButton } from '@/components/button';
+import { DataInput } from '@/components/data-input';
 import { Divider } from '@/components/divider';
+import { Panel } from '@/components/panel';
 import { ThemedText } from '@/components/themed-text';
-import { Radius, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Spacing } from '@/constants/theme';
 
 type QuoteActionsDialogProps = {
   visible: boolean;
@@ -32,9 +25,8 @@ type QuoteActionsDialogProps = {
   onDelete: () => void;
 };
 
-// Per-quote actions, opened by tapping a row in either quote list. A centred
-// sheet over a dimmed backdrop — no drop shadow; a hairline outline and the
-// scrim carry the elevation.
+// Per-quote actions, opened by tapping a row in either quote list. A floating
+// panel (elevation +2, screwed like every other module) over a dimmed scrim.
 //
 // Renaming is inline because it's the common case. The two heavier actions sit
 // below a divider, ordered by consequence: editing (reversible) above deleting
@@ -55,7 +47,6 @@ export function QuoteActionsDialog({
   onEdit,
   onDelete,
 }: QuoteActionsDialogProps) {
-  const theme = useTheme();
   const [name, setName] = useState(initialName);
   const busy = saving || deleting;
 
@@ -86,74 +77,63 @@ export function QuoteActionsDialog({
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.centre}>
           {/* Swallow presses inside the sheet so they don't reach the scrim. */}
-          <Pressable
-            onPress={() => {}}
-            style={[
-              styles.sheet,
-              { backgroundColor: theme.background, borderColor: theme.hairline },
-            ]}>
-            <View style={styles.header}>
-              <ThemedText type="heading">Name this quote</ThemedText>
-              <ThemedText type="caption">
-                Label it however the customer refers to it. Leave it blank to go back to “{label}”.
-              </ThemedText>
-            </View>
-
-            <View style={styles.field}>
-              <ThemedText type="label">Name</ThemedText>
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                onSubmitEditing={() => !busy && onSubmit(name)}
-                placeholder="e.g. Mrs Patel — 14 Oak Ave"
-                placeholderTextColor={theme.muted}
-                autoFocus
-                autoCapitalize="words"
-                returnKeyType="done"
-                maxLength={120}
-                style={[
-                  styles.input,
-                  {
-                    color: theme.ink,
-                    backgroundColor: theme.surface,
-                    borderColor: theme.hairline,
-                  },
-                ]}
-              />
-              {failed && (
-                <ThemedText type="caption" themeColor="danger">
-                  Couldn&apos;t save that — check your connection and try again.
+          <Pressable onPress={() => {}} style={styles.sheetWrap}>
+            <Panel elevated style={styles.sheet}>
+              <View style={styles.header}>
+                <ThemedText type="heading">Name this quote</ThemedText>
+                <ThemedText type="caption">
+                  Label it however the customer refers to it. Leave it blank to go back to
+                  “{label}”.
                 </ThemedText>
-              )}
-            </View>
+              </View>
 
-            <View style={styles.actions}>
-              <SecondaryButton
-                label="Cancel"
-                onPress={onCancel}
-                disabled={busy}
-                style={styles.action}
-              />
-              <PrimaryButton
-                label="Save"
-                onPress={() => onSubmit(name)}
-                loading={saving}
-                disabled={deleting}
-                style={styles.action}
-              />
-            </View>
+              <View style={styles.field}>
+                <ThemedText type="label">Name</ThemedText>
+                <DataInput
+                  value={name}
+                  onChangeText={setName}
+                  onSubmitEditing={() => !busy && onSubmit(name)}
+                  placeholder="e.g. Mrs Patel — 14 Oak Ave"
+                  autoFocus
+                  autoCapitalize="words"
+                  returnKeyType="done"
+                  maxLength={120}
+                />
+                {failed && (
+                  <ThemedText type="caption" themeColor="danger">
+                    Couldn&apos;t save that — check your connection and try again.
+                  </ThemedText>
+                )}
+              </View>
 
-            <Divider />
+              <View style={styles.actions}>
+                <SecondaryButton
+                  label="Cancel"
+                  onPress={onCancel}
+                  disabled={busy}
+                  style={styles.action}
+                />
+                <PrimaryButton
+                  label="Save"
+                  onPress={() => onSubmit(name)}
+                  loading={saving}
+                  disabled={deleting}
+                  style={styles.action}
+                />
+              </View>
 
-            <View style={styles.secondary}>
-              <TextButton label="Edit the full quote" onPress={onEdit} disabled={busy} />
-              <TextButton
-                label={deleting ? 'Deleting…' : 'Delete quote'}
-                onPress={onDelete}
-                disabled={busy}
-                tone="danger"
-              />
-            </View>
+              <Divider />
+
+              <View style={styles.secondary}>
+                <TextButton label="Edit the full quote" onPress={onEdit} disabled={busy} />
+                <TextButton
+                  label={deleting ? 'Deleting…' : 'Delete quote'}
+                  onPress={onDelete}
+                  disabled={busy}
+                  tone="danger"
+                />
+              </View>
+            </Panel>
           </Pressable>
         </KeyboardAvoidingView>
       </Pressable>
@@ -164,20 +144,20 @@ export function QuoteActionsDialog({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(12, 10, 9, 0.4)',
+    // Charcoal scrim, so the chassis dims rather than tints.
+    backgroundColor: 'rgba(20, 24, 28, 0.5)',
   },
   centre: {
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: Spacing.four,
   },
-  sheet: {
+  sheetWrap: {
     width: '100%',
     maxWidth: 420,
     alignSelf: 'center',
-    borderRadius: Radius.sheet,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: Spacing.four,
+  },
+  sheet: {
     gap: Spacing.four,
   },
   header: {
@@ -185,13 +165,6 @@ const styles = StyleSheet.create({
   },
   field: {
     gap: Spacing.two,
-  },
-  input: {
-    height: 50,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Radius.control,
-    borderWidth: StyleSheet.hairlineWidth,
-    fontSize: 17,
   },
   actions: {
     flexDirection: 'row',

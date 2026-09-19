@@ -9,6 +9,7 @@ import {
 import React from 'react';
 import { Pressable, View, StyleSheet } from 'react-native';
 
+import { Led } from './led';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -54,9 +55,10 @@ export function CustomTabList(props: TabListProps) {
   return (
     <ThemedView {...props} style={[styles.tabListContainer, { borderBottomColor: theme.hairline }]}>
       <View style={styles.innerContainer}>
-        <ThemedText type="bodyBold" style={styles.brandText}>
-          SnapQuote
-        </ThemedText>
+        {/* Same power-LED nameplate as the native screens. */}
+        <View style={styles.brand}>
+          <Led tone="accent" label="SnapQuote" />
+        </View>
 
         {props.children}
       </View>
@@ -82,7 +84,7 @@ const styles = StyleSheet.create({
     gap: Spacing.four,
     maxWidth: MaxContentWidth,
   },
-  brandText: {
+  brand: {
     marginRight: 'auto',
   },
   pressed: {

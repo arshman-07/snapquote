@@ -1,10 +1,14 @@
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import { ExternalLink } from 'lucide-react-native';
 import { Fragment, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { SecondaryButton } from '@/components/button';
 import { Divider } from '@/components/divider';
+import { Field } from '@/components/field';
+import { Led } from '@/components/led';
+import { Panel } from '@/components/panel';
 import { QuoteStepScreen } from '@/components/quote-step-screen';
 import { StepFooter } from '@/components/step-footer';
 import { ThemedText } from '@/components/themed-text';
@@ -16,15 +20,15 @@ import {
 } from '@/constants/materials-mock';
 import { Radius, Spacing } from '@/constants/theme';
 import { getArea, useQuoteDraft } from '@/context/quote-draft';
-import { useTheme } from '@/hooks/use-theme';
+import { useShadows, useTheme } from '@/hooks/use-theme';
 
 // Step 3 — Materials. The user describes the work, then we present three
 // itemized packages (Budget / Standard / Premium) to choose from. In Phase 1
 // the options come from a deterministic mock; Phase 3 swaps in a Directus call
 // that runs the AI + retailer lookup. The response shape is identical either way.
 //
-// This is the one screen where the accent marks selection: the chosen tier card
-// is one of its three sanctioned uses.
+// Each package is a price-tag panel hung from a punched hole; the chosen one is
+// backlit with an accent ring and a lit "Selected" LED.
 export default function MaterialsScreen() {
   const router = useRouter();
   const { draft, updateDraft } = useQuoteDraft();
@@ -66,23 +70,24 @@ export default function MaterialsScreen() {
         />
       }>
       {/* Free-text brief — feeds the AI lookup in Phase 3. */}
-      <View style={styles.section}>
-        <ThemedText type="label">Describe the work</ThemedText>
-        <BriefInput
-          value={draft.materialBrief}
-          onChangeText={(materialBrief) => updateDraft({ materialBrief })}
-          jobType={draft.jobType}
-        />
-      </View>
+      <Field
+        label="Describe the work"
+        value={draft.materialBrief}
+        onChangeText={(materialBrief) => updateDraft({ materialBrief })}
+        placeholder={briefPlaceholder(draft.jobType)}
+        multiline
+      />
 
       {/* Optional ZIP — regional pricing once the lookup is real. */}
-      <View style={styles.section}>
-        <ThemedText type="label">ZIP code (optional)</ThemedText>
-        <ZipInput
-          value={draft.materialZip}
-          onChangeText={(materialZip) => updateDraft({ materialZip })}
-        />
-      </View>
+      <Field
+        label="ZIP code (optional)"
+        value={draft.materialZip}
+        onChangeText={(materialZip) => updateDraft({ materialZip })}
+        placeholder="e.g. 78701"
+        keyboardType="number-pad"
+        maxLength={5}
+        suffix="for local pricing"
+      />
 
       {/* Fetch / refresh options. Secondary, not primary — "Continue" in the
           footer is this screen's primary action and there is only ever one. */}
@@ -118,9 +123,10 @@ export default function MaterialsScreen() {
   );
 }
 
-// One selectable package: header (title / tagline / subtotal), the itemized
-// list, and a select action. These sit directly on the page background — they
-// are the content, not a wrapper around it — so they don't count as card-in-card.
+// One selectable package, styled as a hanging price tag: a punched hole at
+// the top, header (title / tagline / subtotal), the itemized list separated by
+// grooves, and a select key. The chosen card keeps its panel shadow and gains an
+// accent backlight ring plus a lit "Selected" LED — never colour alone.
 function PackageCard({
   pkg,
   selected,
@@ -131,17 +137,22 @@ function PackageCard({
   onSelect: () => void;
 }) {
   const theme = useTheme();
+  const shadows = useShadows();
 
   return (
-    <View
+    <Panel
+      screws={false}
       style={[
         styles.card,
-        {
-          backgroundColor: theme.surface,
-          borderColor: selected ? theme.accent : theme.hairline,
-          borderWidth: selected ? 1.5 : StyleSheet.hairlineWidth,
-        },
+        selected && { boxShadow: `${shadows.card}, 0px 0px 0px 2px ${theme.accent}` },
       ]}>
+      {/* Hanging hole punched through the tag. */}
+      <View
+        style={[styles.hole, { backgroundColor: theme.recessed, boxShadow: shadows.dimple }]}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      />
+
       <View style={styles.cardHeader}>
         <View style={styles.cardHeading}>
           <ThemedText type="heading">{pkg.title}</ThemedText>
@@ -163,32 +174,21 @@ function PackageCard({
 
       {selected ? (
         <View style={styles.selectedRow}>
-          <ThemedText type="label" themeColor="accent">
-            Selected
-          </ThemedText>
+          <Led tone="accent" label="Selected" />
         </View>
       ) : (
-        <Pressable
-          onPress={onSelect}
-          accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.selectButton,
-            { borderColor: theme.hairline },
-            pressed && styles.pressed,
-          ]}>
-          <ThemedText type="bodyBold" themeColor="body">
-            Select this package
-          </ThemedText>
-        </Pressable>
+        <SecondaryButton label="Select this package" onPress={onSelect} />
       )}
-    </View>
+    </Panel>
   );
 }
 
 // A single material line: name + price, a plain-English explanation, the
-// quantity, and a tappable "Buy at <retailer>" link. The link is `ink`, not
-// accent — the selected-card border is already this screen's accent.
+// quantity, and a tappable "Buy at <retailer>" link. The link is ink with an
+// external-link glyph rather than accent: red fails contrast at caption size.
 function LineItem({ item }: { item: MaterialLineItem }) {
+  const theme = useTheme();
+
   return (
     <View style={styles.item}>
       <View style={styles.itemHeader}>
@@ -204,60 +204,15 @@ function LineItem({ item }: { item: MaterialLineItem }) {
         <ThemedText type="label">{item.quantity}</ThemedText>
         <Pressable
           accessibilityRole="link"
-          hitSlop={Spacing.two}
-          onPress={() => void WebBrowser.openBrowserAsync(item.url)}>
-          <ThemedText type="caption" themeColor="ink" style={styles.buyLink}>
-            Buy at {item.retailer} ›
+          hitSlop={Spacing.three}
+          onPress={() => void WebBrowser.openBrowserAsync(item.url)}
+          style={({ pressed }) => [styles.buyLink, pressed && styles.pressed]}>
+          <ThemedText type="caption" themeColor="ink" style={styles.buyLinkText}>
+            Buy at {item.retailer}
           </ThemedText>
+          <ExternalLink size={14} strokeWidth={2} color={theme.ink} />
         </Pressable>
       </View>
-    </View>
-  );
-}
-
-function BriefInput({
-  value,
-  onChangeText,
-  jobType,
-}: {
-  value: string;
-  onChangeText: (text: string) => void;
-  jobType: string | null;
-}) {
-  const theme = useTheme();
-
-  return (
-    <TextInput
-      value={value}
-      onChangeText={onChangeText}
-      placeholder={briefPlaceholder(jobType)}
-      placeholderTextColor={theme.muted}
-      multiline
-      style={[
-        styles.briefInput,
-        { color: theme.ink, backgroundColor: theme.surface, borderColor: theme.hairline },
-      ]}
-    />
-  );
-}
-
-function ZipInput({ value, onChangeText }: { value: string; onChangeText: (text: string) => void }) {
-  const theme = useTheme();
-
-  return (
-    <View style={[styles.inputRow, { backgroundColor: theme.surface, borderColor: theme.hairline }]}>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder="e.g. 78701"
-        placeholderTextColor={theme.muted}
-        keyboardType="number-pad"
-        maxLength={5}
-        style={[styles.input, { color: theme.ink }]}
-      />
-      <ThemedText type="caption" themeColor="muted">
-        for local pricing
-      </ThemedText>
     </View>
   );
 }
@@ -273,34 +228,8 @@ function formatDate(iso: string): string {
 }
 
 const styles = StyleSheet.create({
-  section: {
-    gap: Spacing.two,
-  },
-  briefInput: {
-    minHeight: 88,
-    fontSize: 17,
-    lineHeight: 24,
-    textAlignVertical: 'top',
-    padding: Spacing.three,
-    borderRadius: Radius.control,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    height: 50,
-    borderRadius: Radius.control,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  input: {
-    flex: 1,
-    height: '100%',
-    fontSize: 17,
-  },
   results: {
-    gap: Spacing.three,
+    gap: Spacing.four,
   },
   resultsHeader: {
     flexDirection: 'row',
@@ -308,9 +237,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   card: {
-    borderRadius: Radius.sheet,
-    padding: Spacing.four,
     gap: Spacing.three,
+    // Room for the hanging hole above the header.
+    paddingTop: Spacing.five + Spacing.two,
+  },
+  hole: {
+    position: 'absolute',
+    top: Spacing.three,
+    alignSelf: 'center',
+    width: 12,
+    height: 12,
+    borderRadius: Radius.full,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -344,17 +281,15 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.one,
   },
   buyLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  buyLinkText: {
     fontWeight: '600',
   },
-  selectButton: {
-    height: 44,
-    borderRadius: Radius.control,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   selectedRow: {
-    height: 44,
+    minHeight: 52,
     alignItems: 'center',
     justifyContent: 'center',
   },

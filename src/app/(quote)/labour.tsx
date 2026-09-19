@@ -1,26 +1,33 @@
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Minus, Plus } from 'lucide-react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
-import { Divider } from '@/components/divider';
+import { Key } from '@/components/button';
+import { Chip } from '@/components/chip';
+import { Field } from '@/components/field';
+import { Panel } from '@/components/panel';
 import { QuoteStepScreen } from '@/components/quote-step-screen';
+import { Readout, ReadoutText } from '@/components/readout';
 import { StepFooter } from '@/components/step-footer';
 import { ThemedText } from '@/components/themed-text';
-import { CURRENCY_CODE, LABOUR_RATE_PRESETS, formatAmount } from '@/constants/quote';
+import { CURRENCY_CODE, LABOUR_RATE_PRESETS, formatAmount, formatMoney } from '@/constants/quote';
 import { Radius, Spacing } from '@/constants/theme';
 import { getLabourTotal, useQuoteDraft } from '@/context/quote-draft';
 import { useLabourRates } from '@/hooks/use-labour-rates';
-import { useTheme } from '@/hooks/use-theme';
+import { useShadows, useTheme } from '@/hooks/use-theme';
 
 // Step 4 — Labour. Priced as days on site × a daily rate (USD). Days use a
-// tactile stepper; the rate has quick-pick presets plus a custom field, with a
-// live total so the cost updates as they go.
+// physical stepper (two round keys either side of a recessed counter window);
+// the rate has latching quick-pick chips plus a custom field, and the running
+// labour total lights up on a readout screen as they go.
 //
-// Currency is stated once in the "Daily rate" label, so every figure below it
-// is bare and tabular.
+// Currency is stated once in the "Daily rate" label, so the chips and field
+// below it are bare; the readout stands alone, so it carries its own "$".
 export default function LabourScreen() {
   const router = useRouter();
   const { draft, updateDraft } = useQuoteDraft();
   const theme = useTheme();
+  const shadows = useShadows();
 
   // Quick-pick rates come from Directus. On error/offline — or an empty,
   // unseeded collection — fall back to the static presets so the step always
@@ -56,22 +63,39 @@ export default function LabourScreen() {
           onBack={() => router.back()}
         />
       }>
-      {/* Days on site — a −/+ stepper. The count is the loudest thing here. */}
-      <View style={styles.section}>
+      {/* Days on site — the count is the loudest thing here, so it sits in its
+          own recessed window between the two keys. */}
+      <Panel style={styles.panel}>
         <ThemedText type="label">Days on site</ThemedText>
-        <View style={[styles.stepper, { borderColor: theme.hairline }]}>
-          <StepperButton label="−" onPress={() => setDays(days - 1)} disabled={days <= 0} />
-          <View style={styles.stepperValue}>
+        <View style={styles.stepper}>
+          <Key
+            onPress={() => setDays(days - 1)}
+            disabled={days <= 0}
+            accessibilityLabel="One day fewer"
+            faceStyle={styles.stepperKey}>
+            <Minus size={22} strokeWidth={2} color={theme.ink} />
+          </Key>
+          <View
+            style={[
+              styles.counter,
+              { backgroundColor: theme.background, boxShadow: shadows.recessed },
+            ]}
+            accessibilityLabel={`${days} ${days === 1 ? 'day' : 'days'}`}>
             <ThemedText type="display" tabular>
               {days}
             </ThemedText>
             <ThemedText type="label">{days === 1 ? 'day' : 'days'}</ThemedText>
           </View>
-          <StepperButton label="+" onPress={() => setDays(days + 1)} />
+          <Key
+            onPress={() => setDays(days + 1)}
+            accessibilityLabel="One day more"
+            faceStyle={styles.stepperKey}>
+            <Plus size={22} strokeWidth={2} color={theme.ink} />
+          </Key>
         </View>
-      </View>
+      </Panel>
 
-      {/* Daily rate — quick-pick presets plus a custom field. */}
+      {/* Daily rate — quick-pick chips plus a custom field. */}
       <View style={styles.section}>
         <ThemedText type="label">Daily rate ({CURRENCY_CODE})</ThemedText>
         {ratesQuery.isLoading ? (
@@ -81,181 +105,82 @@ export default function LabourScreen() {
           </View>
         ) : (
           <View style={styles.chipRow}>
-            {ratePresets.map((preset) => {
-              const selected = String(preset) === draft.labourDayRate;
-              return (
-                <Pressable
-                  key={preset}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  onPress={() => updateDraft({ labourDayRate: String(preset) })}
-                  style={({ pressed }) => [
-                    styles.chip,
-                    {
-                      backgroundColor: selected ? theme.ink : theme.surface,
-                      borderColor: selected ? theme.ink : theme.hairline,
-                    },
-                    pressed && styles.pressed,
-                  ]}>
-                  <ThemedText type="body" themeColor={selected ? 'onInk' : 'body'} tabular>
-                    {formatAmount(preset)} / day
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
+            {ratePresets.map((preset) => (
+              <Chip
+                key={preset}
+                label={`${formatAmount(preset)} / day`}
+                selected={String(preset) === draft.labourDayRate}
+                onPress={() => updateDraft({ labourDayRate: String(preset) })}
+                tabular
+              />
+            ))}
           </View>
         )}
         {/* Only badge the fallback as "offline" when the fetch actually failed;
             an empty-but-reachable collection just silently shows the defaults. */}
         {ratesQuery.isError && <ThemedText type="caption">Offline — showing default rates.</ThemedText>}
-        <RateField
+        {/* No "$" prefix — the section label already states the currency. */}
+        <Field
+          label="Custom rate"
           value={draft.labourDayRate}
           onChangeText={(labourDayRate) => updateDraft({ labourDayRate })}
+          keyboardType="decimal-pad"
+          placeholder="0"
+          suffix="/ day"
         />
       </View>
 
       {/* Live labour total, mirroring the floor-area readout on Dimensions. */}
       {labourTotal > 0 && (
-        <View style={styles.readout}>
-          <Divider />
-          <View style={styles.readoutBody}>
-            <ThemedText type="label">Estimated labour</ThemedText>
-            <ThemedText type="display" tabular>
-              {formatAmount(labourTotal)}
-            </ThemedText>
-            <ThemedText type="caption" tabular>
-              {days} {days === 1 ? 'day' : 'days'} × {formatAmount(rate)} / day
-            </ThemedText>
-          </View>
-        </View>
+        <Readout>
+          <ReadoutText variant="label">Estimated labour</ReadoutText>
+          <ReadoutText variant="figure" numberOfLines={1} adjustsFontSizeToFit>
+            {formatMoney(labourTotal)}
+          </ReadoutText>
+          <ReadoutText>
+            {days} {days === 1 ? 'day' : 'days'} × {formatMoney(rate)} / day
+          </ReadoutText>
+        </Readout>
       )}
     </QuoteStepScreen>
   );
 }
 
-// −/+ control for the day stepper.
-function StepperButton({
-  label,
-  onPress,
-  disabled,
-}: {
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-}) {
-  const theme = useTheme();
-
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      style={({ pressed }) => [
-        styles.stepperButton,
-        { borderColor: theme.hairline },
-        pressed && styles.pressed,
-        disabled && styles.disabled,
-      ]}>
-      <ThemedText type="heading">{label}</ThemedText>
-    </Pressable>
-  );
-}
-
-// Custom daily-rate input. No "$" prefix — the section label already states the
-// currency, and repeating it here would misalign the figure.
-function RateField({
-  value,
-  onChangeText,
-}: {
-  value: string;
-  onChangeText: (text: string) => void;
-}) {
-  const theme = useTheme();
-
-  return (
-    <View
-      style={[styles.inputRow, { backgroundColor: theme.surface, borderColor: theme.hairline }]}>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        keyboardType="decimal-pad"
-        placeholder="Custom rate"
-        placeholderTextColor={theme.muted}
-        style={[styles.input, { color: theme.ink }]}
-      />
-      <ThemedText type="body" themeColor="muted">
-        / day
-      </ThemedText>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
+  panel: {
+    gap: Spacing.three,
+    // Clear the corner screws.
+    paddingTop: Spacing.five,
+  },
   section: {
-    gap: Spacing.two,
+    gap: Spacing.three,
   },
   stepper: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-    borderRadius: Radius.control,
-    borderWidth: StyleSheet.hairlineWidth,
+    gap: Spacing.three,
   },
-  stepperValue: {
-    alignItems: 'center',
-    gap: Spacing.one,
+  stepperKey: {
+    width: 56,
+    height: 56,
+    borderRadius: Radius.full,
   },
-  stepperButton: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.control,
-    borderWidth: StyleSheet.hairlineWidth,
+  counter: {
+    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: Spacing.two,
+    borderRadius: Radius.md,
   },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.two,
+    // Wide enough that neighbouring keys' shadows don't merge.
+    gap: Spacing.three,
   },
   chipLoading: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
     paddingVertical: Spacing.two,
-  },
-  chip: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Radius.control,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    height: 50,
-    borderRadius: Radius.control,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  input: {
-    flex: 1,
-    height: '100%',
-    fontSize: 17,
-  },
-  readout: {
-    gap: Spacing.three,
-  },
-  readoutBody: {
-    gap: Spacing.one,
-  },
-  pressed: {
-    opacity: 0.6,
-  },
-  disabled: {
-    opacity: 0.35,
   },
 });

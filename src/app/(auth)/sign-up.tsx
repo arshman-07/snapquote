@@ -1,24 +1,18 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AuthField } from '@/components/auth-field';
+import { AuthSwitchLink, Nameplate } from '@/components/auth-chrome';
 import { PrimaryButton } from '@/components/button';
+import { Chip } from '@/components/chip';
+import { Field } from '@/components/field';
+import { Panel } from '@/components/panel';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
-import { useTheme } from '@/hooks/use-theme';
 import { registerSchema, type RegisterForm } from '@/lib/auth-schema';
 
 // Map a failed sign-up to something actionable. signUp does two calls
@@ -47,9 +41,11 @@ function registerErrorMessage(error: unknown): string {
 // account type and a name, and for contractors a company name — then drop
 // straight into the app. The profile fields are written after login (the public
 // register endpoint can't set them); see `signUp` in the auth context.
+//
+// Layout mirrors login: nameplate, stamped headline, then one bolted-on panel
+// holding the whole form and ending in the red primary key.
 export default function SignUpScreen() {
   const { signUp } = useAuth();
-  const theme = useTheme();
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -92,9 +88,9 @@ export default function SignUpScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.container}>
         <KeyboardAvoidingView
-          style={styles.flex}
+          style={styles.container}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           {/* This form runs to six fields once a type is picked, so it has to
               scroll — centring it in a fixed view clipped the bottom. */}
@@ -102,57 +98,42 @@ export default function SignUpScreen() {
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled">
+            <Nameplate />
+
             <View style={styles.header}>
               <ThemedText type="title">Create your account</ThemedText>
               <ThemedText themeColor="body">Sign up to start quoting.</ThemedText>
             </View>
 
-            {/* Account type — decides which profile fields apply below.
-                Selection is an `ink` fill, not the accent: this is a control,
-                and the accent stays reserved for progress, material tier and
-                status badges. */}
-            <Controller
-              control={control}
-              name="userType"
-              render={({ field, fieldState }) => (
-                <View style={styles.field}>
-                  <ThemedText type="label">I’m a…</ThemedText>
-                  <View style={[styles.segment, { borderColor: theme.hairline }]}>
-                    {(['contractor', 'homeowner'] as const).map((type, index) => {
-                      const selected = field.value === type;
-                      return (
-                        <Pressable
+            <Panel vents style={styles.form}>
+              {/* Account type — decides which profile fields apply below. A
+                  pair of latching chips, full width between them. */}
+              <Controller
+                control={control}
+                name="userType"
+                render={({ field, fieldState }) => (
+                  <View style={styles.field}>
+                    <ThemedText type="label">I’m a…</ThemedText>
+                    <View style={styles.selector}>
+                      {(['contractor', 'homeowner'] as const).map((type) => (
+                        <Chip
                           key={type}
+                          label={type === 'contractor' ? 'Contractor' : 'Homeowner'}
+                          selected={field.value === type}
                           onPress={() => field.onChange(type)}
-                          accessibilityRole="radio"
-                          accessibilityState={{ selected }}
-                          style={[
-                            styles.segmentItem,
-                            selected && { backgroundColor: theme.ink },
-                            index === 1 && {
-                              borderLeftWidth: StyleSheet.hairlineWidth,
-                              borderLeftColor: theme.hairline,
-                            },
-                          ]}>
-                          <ThemedText
-                            type="bodyBold"
-                            themeColor={selected ? 'onInk' : 'body'}>
-                            {type === 'contractor' ? 'Contractor' : 'Homeowner'}
-                          </ThemedText>
-                        </Pressable>
-                      );
-                    })}
+                          style={styles.selectorItem}
+                        />
+                      ))}
+                    </View>
+                    {fieldState.error && (
+                      <ThemedText type="caption" themeColor="danger">
+                        {fieldState.error.message}
+                      </ThemedText>
+                    )}
                   </View>
-                  {fieldState.error && (
-                    <ThemedText type="caption" themeColor="danger">
-                      {fieldState.error.message}
-                    </ThemedText>
-                  )}
-                </View>
-              )}
-            />
+                )}
+              />
 
-            <View style={styles.fields}>
               {/* Contractors give a company name; the name field below then asks
                   for the owner. Homeowners just give their own name. */}
               {userType === 'contractor' && (
@@ -160,7 +141,7 @@ export default function SignUpScreen() {
                   control={control}
                   name="companyName"
                   render={({ field, fieldState }) => (
-                    <AuthField
+                    <Field
                       label="Company name"
                       value={field.value}
                       onChangeText={field.onChange}
@@ -177,7 +158,7 @@ export default function SignUpScreen() {
                   control={control}
                   name="fullName"
                   render={({ field, fieldState }) => (
-                    <AuthField
+                    <Field
                       label={userType === 'contractor' ? "Company owner’s name" : 'Your name'}
                       value={field.value}
                       onChangeText={field.onChange}
@@ -194,7 +175,7 @@ export default function SignUpScreen() {
                 control={control}
                 name="email"
                 render={({ field, fieldState }) => (
-                  <AuthField
+                  <Field
                     label="Email"
                     value={field.value}
                     onChangeText={field.onChange}
@@ -211,7 +192,7 @@ export default function SignUpScreen() {
                 control={control}
                 name="password"
                 render={({ field, fieldState }) => (
-                  <AuthField
+                  <Field
                     label="Password"
                     value={field.value}
                     onChangeText={field.onChange}
@@ -228,7 +209,7 @@ export default function SignUpScreen() {
                 control={control}
                 name="confirmPassword"
                 render={({ field, fieldState }) => (
-                  <AuthField
+                  <Field
                     label="Confirm password"
                     value={field.value}
                     onChangeText={field.onChange}
@@ -242,34 +223,25 @@ export default function SignUpScreen() {
                   />
                 )}
               />
-            </View>
 
-            {/* Server-side failure (email taken / offline / registration off)
-                lives above the button so it survives field edits until the next
-                attempt. */}
-            {serverError && (
-              <ThemedText type="caption" themeColor="danger">
-                {serverError}
-              </ThemedText>
-            )}
+              {/* Server-side failure (email taken / offline / registration off)
+                  lives above the key so it survives field edits until the next
+                  attempt. */}
+              {serverError && (
+                <ThemedText type="caption" themeColor="danger">
+                  {serverError}
+                </ThemedText>
+              )}
 
-            <PrimaryButton
-              label="Create account"
-              onPress={onSubmit}
-              disabled={!canSubmit}
-              loading={submitting}
-            />
+              <PrimaryButton
+                label="Create account"
+                onPress={onSubmit}
+                disabled={!canSubmit}
+                loading={submitting}
+              />
+            </Panel>
 
-            <View style={styles.footRow}>
-              <ThemedText type="caption">Already have an account? </ThemedText>
-              <Link href="/login" asChild>
-                <Pressable hitSlop={Spacing.two}>
-                  <ThemedText type="caption" themeColor="ink" style={styles.footLink}>
-                    Sign in
-                  </ThemedText>
-                </Pressable>
-              </Link>
-            </View>
+            <AuthSwitchLink prompt="Already have an account?" action="Sign in" href="/login" />
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -279,12 +251,6 @@ export default function SignUpScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  flex: {
     flex: 1,
   },
   content: {
@@ -300,31 +266,19 @@ const styles = StyleSheet.create({
   header: {
     gap: Spacing.two,
   },
+  form: {
+    gap: Spacing.four,
+    // Clear the vent slots in the top-right corner.
+    paddingTop: Spacing.five,
+  },
   field: {
     gap: Spacing.two,
   },
-  fields: {
+  selector: {
+    flexDirection: 'row',
     gap: Spacing.three,
   },
-  segment: {
-    flexDirection: 'row',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.control,
-    overflow: 'hidden',
-  },
-  segmentItem: {
+  selectorItem: {
     flex: 1,
-    height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  footRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  footLink: {
-    fontWeight: '600',
   },
 });

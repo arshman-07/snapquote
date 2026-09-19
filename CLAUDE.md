@@ -58,14 +58,19 @@ Web overrides use the `.web.tsx` suffix and are resolved automatically by Metro.
 
 ### Theming
 
-`src/constants/theme.ts` exports all design tokens:
-- `Colors` — `{ light, dark }` objects with keys `text`, `background`, `backgroundElement`, `backgroundSelected`, `textSecondary`
-- `Fonts` — platform-specific font family map (`sans`, `serif`, `rounded`, `mono`)
-- `Spacing` — numeric scale (`half`=2 … `six`=64)
-- `BottomTabInset`, `MaxContentWidth` — layout constants
-- `Accent` — single brand blue (`#3c87f7`) for primary actions / progress in the quote flow
+Design direction is **Industrial Skeuomorphism** (neumorphic, top-left lit; see
+`docs/FRONTEND.md` "Design system"). `src/constants/theme.ts` exports all design tokens:
+- `Colors` — `{ light, dark }` (chassis `background`, `surface`, `recessed`, `ink`, `body`,
+  `muted`, `groove`/`highlight`, `accent` safety orange, `onAccent`, `danger`, LED `success`/`warning`)
+- `Shadows` — `{ light, dark }` neumorphic `boxShadow` strings (`card`, `floating`, `pressed`,
+  `recessed`, `key`, `accentKey`, `dimple`)
+- `FontFamilies` + `fontFor(kind, weight)` — Inter / JetBrains Mono, one family per weight
+  (loaded by `useFonts` in the root layout). Never set `fontWeight` alongside a custom family.
+- `Spacing`, `Radius` (`sm`…`xl`, `full`), `Motion` (sprung press curve), `BottomTabInset`, `MaxContentWidth`
 
-Use `useTheme()` (`src/hooks/use-theme.ts`) to get the active color object. `ThemedText` and `ThemedView` are the primary styled primitives and accept a `themeColor` prop keyed to `ThemeColor`.
+Use `useTheme()` / `useShadows()` (`src/hooks/use-theme.ts`). Build pressables on `Key`
+(`components/button.tsx`), panels on `Panel`, inputs on `DataInput`, status on `Led`.
+`ThemedText` (`tabular` = mono figures) and `ThemedView` are the styled text/view primitives.
 
 ### Navigation
 

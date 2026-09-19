@@ -1,8 +1,123 @@
-import { ActivityIndicator, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  type AccessibilityRole,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
+import Animated, { cubicBezier } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
-import { Radius, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Motion, Radius, Spacing } from '@/constants/theme';
+import { useShadows, useTheme } from '@/hooks/use-theme';
+import { keyClick } from '@/lib/haptics';
+
+const mechanical = cubicBezier(...Motion.springCurve);
+
+type KeyProps = {
+  onPress: () => void;
+  children: ReactNode;
+  /**
+   * chassis — a grey key moulded from the same plastic as the page
+   * accent   — the safety-orange key; the one thing on screen to press
+   * ghost    — no key at all until touched, then it sinks into a well
+   */
+  variant?: 'chassis' | 'accent' | 'ghost';
+  /**
+   * Held down. For toggles, chips and segments: a latched key stays pressed
+   * into the panel, the way a physical radio button does.
+   */
+  latched?: boolean;
+  disabled?: boolean;
+  /** Layout for the outer touch target (flex, margins, width). */
+  style?: StyleProp<ViewStyle>;
+  /** Shape of the key face itself (height, padding, radius). */
+  faceStyle?: StyleProp<ViewStyle>;
+  accessibilityRole?: AccessibilityRole;
+  accessibilityLabel?: string;
+  accessibilityState?: { selected?: boolean; busy?: boolean };
+  hitSlop?: number;
+};
+
+/**
+ * A physical key. The building block for every pressable control.
+ *
+ * Pressing obeys the physics: the face travels down `Motion.keyTravel` and its
+ * shadow flips from raised to inset, over a fast sprung curve, with a haptic
+ * click. Both properties are driven by Reanimated CSS transitions, so the key
+ * just declares its up/down look and Reanimated animates between them.
+ */
+export function Key({
+  onPress,
+  children,
+  variant = 'chassis',
+  latched = false,
+  disabled,
+  style,
+  faceStyle,
+  accessibilityRole = 'button',
+  accessibilityLabel,
+  accessibilityState,
+  hitSlop,
+}: KeyProps) {
+  const theme = useTheme();
+  const shadows = useShadows();
+  const [held, setHeld] = useState(false);
+  const down = (held && !disabled) || latched;
+
+  // Per-variant look in the up and down positions.
+  const face: ViewStyle =
+    variant === 'accent'
+      ? {
+          backgroundColor: theme.accent,
+          borderColor: 'rgba(255,255,255,0.2)',
+          borderWidth: 1,
+          boxShadow: down ? shadows.accentPressed : shadows.accentKey,
+        }
+      : variant === 'ghost'
+        ? {
+            backgroundColor: down ? theme.recessed : 'transparent',
+            boxShadow: down ? shadows.recessed : 'none',
+          }
+        : {
+            backgroundColor: theme.background,
+            boxShadow: down ? shadows.pressed : shadows.key,
+          };
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => {
+        setHeld(true);
+        keyClick();
+      }}
+      onPressOut={() => setHeld(false)}
+      disabled={disabled}
+      hitSlop={hitSlop}
+      accessibilityRole={accessibilityRole}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled: !!disabled, ...accessibilityState }}
+      style={style}>
+      <Animated.View
+        style={[
+          styles.face,
+          face,
+          {
+            transform: [{ translateY: down ? Motion.keyTravel : 0 }],
+            transitionProperty: ['transform', 'boxShadow', 'backgroundColor'],
+            transitionDuration: Motion.press,
+            transitionTimingFunction: mechanical,
+          },
+          disabled && styles.inactive,
+          faceStyle,
+        ]}>
+        {children}
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 type ButtonProps = {
   label: string;
@@ -13,71 +128,48 @@ type ButtonProps = {
 };
 
 /**
- * The primary action. Filled with `ink` (near-black in light mode, near-white
- * in dark) — deliberately NOT the orange accent, which stays reserved for
- * progress, selection and status. There should be exactly one of these visible
- * at a time.
+ * The primary action — the safety-orange key. There should be exactly one of
+ * these visible at a time: it is the screen's "press here".
  */
 export function PrimaryButton({ label, onPress, disabled, loading, style }: ButtonProps) {
   const theme = useTheme();
   const inactive = disabled || loading;
 
   return (
-    <Pressable
+    <Key
+      variant="accent"
       onPress={onPress}
       disabled={inactive}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !!inactive, busy: !!loading }}
-      style={({ pressed }) => [
-        styles.base,
-        { backgroundColor: theme.ink },
-        // Dim rather than grey out: keeps the shape stable and avoids
-        // introducing another colour stop just for disabled.
-        inactive && styles.inactive,
-        pressed && !inactive && styles.pressed,
-        style,
-      ]}>
+      accessibilityState={{ busy: !!loading }}
+      style={style}
+      faceStyle={styles.button}>
       {loading ? (
-        <ActivityIndicator color={theme.onInk} />
+        <ActivityIndicator color={theme.onAccent} />
       ) : (
-        <ThemedText type="bodyBold" themeColor="onInk">
+        <ThemedText type="button" themeColor="onAccent">
           {label}
         </ThemedText>
       )}
-    </Pressable>
+    </Key>
   );
 }
 
-/** Lower-emphasis action — hairline outline, no fill. Pairs with PrimaryButton. */
+/** Lower-emphasis action — a grey chassis key. Pairs with PrimaryButton. */
 export function SecondaryButton({ label, onPress, disabled, style }: ButtonProps) {
-  const theme = useTheme();
-
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !!disabled }}
-      style={({ pressed }) => [
-        styles.base,
-        styles.outlined,
-        { borderColor: theme.hairline },
-        disabled && styles.inactive,
-        pressed && !disabled && styles.pressed,
-        style,
-      ]}>
-      <ThemedText type="bodyBold">{label}</ThemedText>
-    </Pressable>
+    <Key onPress={onPress} disabled={disabled} style={style} faceStyle={styles.button}>
+      <ThemedText type="button">{label}</ThemedText>
+    </Key>
   );
 }
 
 /**
- * A text-only action for tertiary things (skip, cancel, "use a different
- * account"). No fill, no border — it should recede.
+ * A tertiary action (skip, cancel, "use a different account"). A flat printed
+ * legend with no key under it until touched — it should recede.
  *
  * `tone="danger"` colours it with the `danger` stop for destructive actions.
- * Destructive still means text-only, not a red fill: a filled red button
- * competes with the primary action and invites the mis-tap it warns about.
+ * Destructive still means flat, not a red key: a filled red button competes
+ * with the primary action and invites the mis-tap it warns about.
  */
 export function TextButton({
   label,
@@ -87,55 +179,36 @@ export function TextButton({
   tone = 'default',
 }: ButtonProps & { tone?: 'default' | 'danger' }) {
   return (
-    <Pressable
+    <Key
+      variant="ghost"
       onPress={onPress}
       disabled={disabled}
-      accessibilityRole="button"
       hitSlop={Spacing.two}
-      style={({ pressed }) => [
-        styles.text,
-        disabled && styles.inactive,
-        pressed && !disabled && styles.pressed,
-        style,
-      ]}>
-      <ThemedText type="link" themeColor={tone === 'danger' ? 'danger' : 'body'}>
+      style={style}
+      faceStyle={styles.text}>
+      <ThemedText type="button" themeColor={tone === 'danger' ? 'danger' : 'body'}>
         {label}
       </ThemedText>
-    </Pressable>
+    </Key>
   );
 }
 
-/** Full-width row wrapper so footers can lay buttons out consistently. */
-export function ButtonRow({ children }: { children: React.ReactNode }) {
-  return <View style={styles.row}>{children}</View>;
-}
-
 const styles = StyleSheet.create({
-  base: {
-    height: 50,
-    borderRadius: Radius.control,
+  face: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  button: {
+    minHeight: 52,
+    borderRadius: Radius.lg,
     paddingHorizontal: Spacing.four,
   },
-  outlined: {
-    backgroundColor: 'transparent',
-    borderWidth: StyleSheet.hairlineWidth,
-  },
   text: {
-    paddingVertical: Spacing.two,
-    alignItems: 'center',
-    justifyContent: 'center',
+    minHeight: 48,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.three,
   },
   inactive: {
-    opacity: 0.35,
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-    alignItems: 'center',
+    opacity: 0.45,
   },
 });

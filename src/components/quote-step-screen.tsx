@@ -1,11 +1,13 @@
 import { useRouter } from 'expo-router';
+import { X } from 'lucide-react-native';
 import { type ReactNode } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Key } from '@/components/button';
 import { StepProgress } from '@/components/step-progress';
 import { ThemedText } from '@/components/themed-text';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { isDraftDirty, useQuoteDraft } from '@/context/quote-draft';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -25,8 +27,8 @@ type QuoteStepScreenProps = {
 // step progress bar, and a consistent title block. Each step supplies its own
 // body and footer.
 //
-// Note the overline is muted, not accent — the progress bar directly above it
-// is already this screen's single accent element.
+// The overline is a muted stamped label, not accent — the lit progress pipe
+// above it is already doing the signalling.
 export function QuoteStepScreen({
   step,
   overline,
@@ -77,16 +79,12 @@ export function QuoteStepScreen({
             modal over the tabs and swiping down only dismisses the topmost
             screen, so without this there is no way out before Summary. */}
         <View style={styles.chrome}>
-          <Pressable
+          <Key
             onPress={close}
-            accessibilityRole="button"
             accessibilityLabel="Close and discard this quote"
-            hitSlop={Spacing.two}
-            style={({ pressed }) => [styles.close, pressed && styles.pressed]}>
-            <ThemedText type="heading" themeColor="body">
-              ✕
-            </ThemedText>
-          </Pressable>
+            faceStyle={styles.close}>
+            <X size={20} strokeWidth={2} color={theme.body} />
+          </Key>
         </View>
 
         <StepProgress current={step} />
@@ -122,21 +120,16 @@ const styles = StyleSheet.create({
   chrome: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    // Pull the close button up into the top padding so it doesn't add a full
-    // gap of its own above the progress bar.
-    marginBottom: -Spacing.four,
+    // Tighten the gap between the close key and the progress pipe below it.
+    marginBottom: -Spacing.three,
   },
+  // A round chassis key — 44pt across plus its shadow, a comfortable target.
   close: {
     width: 44,
     height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: -Spacing.three,
+    borderRadius: Radius.full,
   },
   header: {
     gap: Spacing.two,
-  },
-  pressed: {
-    opacity: 0.5,
   },
 });

@@ -1,10 +1,14 @@
 import { useRouter } from 'expo-router';
 import { Fragment, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 
 import { Divider } from '@/components/divider';
+import { Panel } from '@/components/panel';
 import { QuoteActionsDialog } from '@/components/quote-actions-dialog';
 import { QuoteRow, quoteLabel } from '@/components/quote-row';
+import { ThemedText } from '@/components/themed-text';
+import { CURRENCY_CODE } from '@/constants/quote';
+import { Spacing } from '@/constants/theme';
 import { type RecentQuote } from '@/hooks/use-recent-quotes';
 import { useDeleteQuote } from '@/hooks/use-delete-quote';
 import { useUpdateQuote } from '@/hooks/use-update-quote';
@@ -95,3 +99,77 @@ export function QuoteList({ quotes }: { quotes: RecentQuote[] }) {
     </View>
   );
 }
+
+/**
+ * A saved-quotes list mounted on its own panel, with the stamped section header
+ * and every non-happy state (loading / error / empty) handled in one place, so
+ * Home and the Quotes tab can't drift apart.
+ *
+ * No mock fallback anywhere: fake history with fake totals would mislead, so an
+ * error just says so.
+ */
+export function QuoteListPanel({
+  label,
+  quotes,
+  isLoading,
+  isError,
+  errorText,
+  emptyText,
+}: {
+  label: string;
+  quotes: RecentQuote[];
+  isLoading: boolean;
+  isError: boolean;
+  errorText: string;
+  emptyText: string;
+}) {
+  return (
+    <Panel style={styles.panel}>
+      <View style={styles.header}>
+        <ThemedText type="label">{label}</ThemedText>
+        {/* Currency stated once here so the rows can show bare figures. */}
+        {quotes.length > 0 && <ThemedText type="label">{CURRENCY_CODE}</ThemedText>}
+      </View>
+      <Divider />
+
+      {isLoading ? (
+        <View style={styles.status}>
+          <ActivityIndicator />
+        </View>
+      ) : isError ? (
+        <ThemedText type="caption" style={styles.message}>
+          {errorText}
+        </ThemedText>
+      ) : quotes.length > 0 ? (
+        <QuoteList quotes={quotes} />
+      ) : (
+        <ThemedText type="caption" style={styles.message}>
+          {emptyText}
+        </ThemedText>
+      )}
+    </Panel>
+  );
+}
+
+const styles = StyleSheet.create({
+  panel: {
+    // Rows bring their own vertical padding; keep the panel's lighter so the
+    // first and last rows don't float.
+    paddingVertical: Spacing.three,
+    gap: Spacing.two,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    // Clear the corner screws, which sit 12pt in from the top.
+    paddingTop: Spacing.two,
+  },
+  status: {
+    paddingVertical: Spacing.three,
+    alignItems: 'flex-start',
+  },
+  message: {
+    paddingVertical: Spacing.three,
+  },
+});

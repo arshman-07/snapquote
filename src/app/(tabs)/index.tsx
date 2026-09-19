@@ -1,28 +1,33 @@
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { PrimaryButton } from '@/components/button';
-import { QuoteList } from '@/components/quote-list';
+import { PrimaryButton, TextButton } from '@/components/button';
+import { Led } from '@/components/led';
+import { Panel } from '@/components/panel';
+import { QuoteListPanel } from '@/components/quote-list';
+import { formatDate, quoteLabel } from '@/components/quote-row';
+import { Readout, ReadoutText } from '@/components/readout';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { CURRENCY_CODE } from '@/constants/quote';
+import { formatMoney } from '@/constants/quote';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
 import { useRecentQuotes } from '@/hooks/use-recent-quotes';
 
-// Home tab — the app's landing screen. Brand header, the primary entry point
-// into the quote flow, and the five most recent saved quotes from Directus
-// (auto-refreshed when a new quote is saved; pull down to refetch).
+// Home tab — the app's landing screen, laid out like the front of a device:
+// a nameplate strip, the headline, then the main "control module" (a screen
+// showing the latest quote above the red Start key), then the five most recent
+// saved quotes from Directus (auto-refreshed on save; pull down to refetch).
 //
-// Deliberately neutral end to end: no accent appears here at all. "Start a new
-// quote" is the single most prominent element on the screen, and nothing else
-// competes with it for attention.
+// "Start a new quote" is the one accent key on the screen — everything else is
+// grey plastic so nothing competes with it.
 export default function HomeScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
   const quotesQuery = useRecentQuotes();
   const quotes = quotesQuery.data ?? [];
+  const latest = quotes[0];
 
   return (
     <ThemedView style={styles.container}>
@@ -36,47 +41,52 @@ export default function HomeScreen() {
               onRefresh={() => quotesQuery.refetch()}
             />
           }>
-          {/* Brand header. Sign out recedes to a micro-label — it's a rare
-              action and shouldn't read as a button next to the CTA. */}
-          <View style={styles.headerRow}>
-            <View style={styles.header}>
-              <ThemedText type="title">SnapQuote</ThemedText>
-              <ThemedText themeColor="body">Quick quotes for construction jobs.</ThemedText>
-            </View>
-            <Pressable
-              onPress={() => signOut()}
-              hitSlop={Spacing.three}
-              accessibilityRole="button"
-              style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedText type="label">Sign out</ThemedText>
-            </Pressable>
+          {/* Nameplate strip. Sign out is a flat ghost key — a rare action that
+              shouldn't read as a real button next to the Start key. */}
+          <View style={styles.plate}>
+            <Led tone="accent" label="SnapQuote" />
+            <TextButton label="Sign out" onPress={() => signOut()} />
           </View>
 
-          <PrimaryButton label="Start a new quote" onPress={() => router.push('/new-quote')} />
+          <ThemedText type="title">Quick quotes for construction jobs.</ThemedText>
 
-          {/* Recent quotes — live from Directus. No mock fallback: fake quote
-              history with fake totals would mislead, so errors just say so. */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <ThemedText type="label">Recent quotes</ThemedText>
-              {/* Currency stated once here so the rows can show bare figures. */}
-              {quotes.length > 0 && <ThemedText type="label">{CURRENCY_CODE}</ThemedText>}
-            </View>
+          {/* The control module: the latest quote on the screen, and the key
+              that starts the next one. */}
+          <Panel elevated vents style={styles.module}>
+            <Readout>
+              <ReadoutText variant="label">Latest quote</ReadoutText>
+              {quotesQuery.isLoading ? (
+                <ReadoutText>Loading…</ReadoutText>
+              ) : latest ? (
+                <>
+                  {/* Standalone figure with no USD header above it, so it
+                      carries its own "$". */}
+                  <ReadoutText variant="figure" numberOfLines={1} adjustsFontSizeToFit>
+                    {formatMoney(latest.grand_total ?? 0)}
+                  </ReadoutText>
+                  <ReadoutText numberOfLines={1}>
+                    {quoteLabel(latest)} · {formatDate(latest.date_created)}
+                  </ReadoutText>
+                </>
+              ) : (
+                <>
+                  <ReadoutText variant="figure">— — —</ReadoutText>
+                  <ReadoutText>{quotesQuery.isError ? 'No data' : 'No quotes yet'}</ReadoutText>
+                </>
+              )}
+            </Readout>
 
-            {quotesQuery.isLoading ? (
-              <View style={styles.listStatus}>
-                <ActivityIndicator />
-              </View>
-            ) : quotesQuery.isError ? (
-              <ThemedText type="caption">
-                Couldn&apos;t load recent quotes — pull down to retry.
-              </ThemedText>
-            ) : quotes.length > 0 ? (
-              <QuoteList quotes={quotes} />
-            ) : (
-              <ThemedText type="caption">No quotes yet — start one above.</ThemedText>
-            )}
-          </View>
+            <PrimaryButton label="Start a new quote" onPress={() => router.push('/new-quote')} />
+          </Panel>
+
+          <QuoteListPanel
+            label="Recent quotes"
+            quotes={quotes}
+            isLoading={quotesQuery.isLoading}
+            isError={quotesQuery.isError}
+            errorText="Couldn't load recent quotes — pull down to retry."
+            emptyText="No quotes yet — start one above."
+          />
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -96,34 +106,21 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.four,
+    paddingTop: Spacing.three,
+    paddingBottom: BottomTabInset + Spacing.five,
     gap: Spacing.five,
   },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: Spacing.three,
-  },
-  header: {
-    flex: 1,
-    gap: Spacing.two,
-  },
-  section: {
-    gap: Spacing.two,
-  },
-  sectionHeader: {
+  plate: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: Spacing.one,
+    // The ghost key has its own padding; pull it flush with the gutter.
+    marginRight: -Spacing.three,
+    marginBottom: -Spacing.four,
   },
-  listStatus: {
-    paddingVertical: Spacing.three,
-    alignItems: 'flex-start',
-  },
-  pressed: {
-    opacity: 0.5,
+  module: {
+    gap: Spacing.four,
+    // Clear the vent slots in the top-right corner.
+    paddingTop: Spacing.five + Spacing.two,
   },
 });

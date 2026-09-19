@@ -9,8 +9,8 @@
 - **Styling:** Theme tokens (`src/constants/theme.ts`) + `ThemedText` / `ThemedView` primitives,
   with `StyleSheet.create` per screen. **No NativeWind, no Tailwind, no UI kit** — see the
   2026-07-27 decision below, which closes that long-standing ambiguity.
-- **Typeface:** none. The system font (San Francisco on iOS) is used by never setting
-  `fontFamily` — the app is deliberately native-iOS in feel rather than custom-branded.
+- **Typeface:** Inter + JetBrains Mono via `@expo-google-fonts` (2026-09-18) — see the
+  Industrial Skeuomorphism design system below.
 - **Language:** TypeScript (`@/*` → `src/*`)
 
 ### Planned for later phases (NOT installed in Phase 1)
@@ -65,57 +65,125 @@
   still `"mobile"` (affects the browser tab title + native app label — cross-platform, left for a
   dedicated branding pass), plus the app icon / splash / favicon assets.
 
-## Design system (2026-07-27)
+## Design system — Industrial Skeuomorphism (2026-09-18, migration in progress)
 
-Direction: **native-iOS feel, not a custom visual identity.** System font, iOS spacing and
-navigation conventions, platform back gestures. No custom typeface, no UI kit, no gradients,
-no drop shadows, **no emoji**.
+Direction: **the app is a physical device.** A matte plastic chassis (the page), panels bolted
+onto it, keys that depress, data slots recessed into the surface, LEDs for status. Replaces the
+2026-07-27 "native-iOS, no shadows" system. Tokens live in `src/constants/theme.ts`.
 
-**Palette** — stone neutrals with near-black actions. Every token has a light *and* a dark
-stop defined up front so dark mode never needs retrofitting (`src/constants/theme.ts`).
+**Migration plan** — one section at a time, each approved and phone-tested before the next:
+
+1. ✅ **Foundation** (tokens, fonts, shared primitives) — 2026-09-18
+2. ✅ **Login + sign-up** — 2026-09-18
+3. ✅ **Home + Quotes tabs, quote rows, actions dialog, native tab bar recolour** — 2026-09-18
+4. ⬜ Quote wizard chrome (pipe progress, footer, close) + the five steps
+5. ⬜ Splash colours, remove the `Radius.control`/`sheet` aliases, final doc pass
+
+Until a section lands, its screens render with the new tokens but the old layouts (flat
+`surface` inputs, hairline chips) — expected, not a regression.
+
+**Light physics.** One light source, **top-left at 45°**: highlights on top/left edges, shadows
+bottom/right. Every depth effect is a `boxShadow` string (native on the New Architecture):
+
+| Token (`useShadows()`) | Level | Use |
+|---|---|---|
+| `recessed` | −1 | inputs, screens, wells |
+| `pressed` | −1 | a key while held / latched |
+| `card` | +1 | `<Panel>` |
+| `key` | +1 | compact keys (chips, stepper) |
+| `floating` | +2 | the dominant panel, dialogs |
+| `accentKey` / `accentPressed` | +1 / −1 | the red primary key |
+| `dimple` | — | screw heads, vent slots, unlit LEDs |
+
+**Palette** — light is canonical workshop grey; dark is a charcoal panel lit by the same rules.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `background` | `#FAFAF9` | `#0C0A09` | page |
-| `surface` | `#FFFFFF` | `#1C1917` | inputs, package cards |
-| `ink` | `#1C1917` | `#FAFAF9` | primary text **and** primary button fill |
-| `body` | `#57534E` | `#A8A29E` | secondary text |
-| `muted` | `#A8A29E` | `#78716C` | labels, hints, timestamps |
-| `hairline` | `#E7E5E4` | `#292524` | dividers |
-| `accent` | `#EA580C` | `#F97316` | **reserved** — see below |
-| `onInk` | `#FAFAF9` | `#1C1917` | text on an `ink` fill |
-| `danger` | `#B91C1C` | `#F87171` | validation/failure only |
+| `background` | `#E0E5EC` | `#2B3036` | chassis — the page and every panel/key face |
+| `surface` | `#F0F2F5` | `#343A42` | lighter raised face, sparingly |
+| `recessed` | `#D1D9E6` | `#23272C` | sunken wells |
+| `ink` | `#2D3436` | `#E0E5EC` | primary text |
+| `body` | `#4A5568` | `#A8B2D1` | secondary text |
+| `muted` | `#566173` | `#939DB0` | labels, placeholders (AA on chassis) |
+| `hairline` / `groove` / `highlight` | | | outlines; the two lips of a `<Divider>` groove |
+| `accent` | `#FF4757` | `#FF4757` | safety orange — primary key, active LED, progress, selection |
+| `onAccent` | `#FFFFFF` | `#FFFFFF` | text on the accent key |
+| `danger` | `#B0302A` | `#FF7A70` | errors — deliberately not the accent red |
+| `success` / `warning` | green / amber | same | LEDs only |
 
-> `ink` is semantic, not literal: it's the primary-emphasis colour, so it inverts in dark mode
-> and primary buttons invert with it automatically.
+**Accent discipline (changed).** The accent *is* now the primary-action colour — the one key to
+press. It stays reserved for interaction and status: never decorative, never body text.
 
-**Accent discipline.** Orange is *not* a primary-action colour — primary actions are `ink`
-fills with `onInk` text. The accent is reserved for the **step-progress bar**, the **selected
-material tier card**, and **status badges**, with at most one accent element visible per
-screen. `danger` is exempt (a validation error must be able to appear anywhere).
+**Typography.** Inter (400/600/700/800) for reading, JetBrains Mono (500/700) for data and
+stamped labels, loaded with `useFonts` in the root layout (render is held until they're in).
+Custom fonts are one family per weight, so **never set `fontWeight` next to a `fontFamily`** —
+`ThemedText` translates any `fontWeight` into the right family via `fontFor()`.
 
-**Structural rules** (these are what keep it from looking templated):
+- Scale: `display` 34 · `title` 28 (800, tight, embossed) · `heading` 20 · `body` 17 ·
+  `caption` 13 · `label` 11 (mono, uppercase, tracked) · `button` 15 (uppercase).
+- `tabular` now means **mono**: every monetary value / figure renders in JetBrains Mono.
+- Inputs are mono too (`DataInput`), like a terminal readout.
 
-- **No card-in-card.** Group with whitespace and alignment, not by wrapping every section in a
-  rounded box. Hairline dividers only where separation is genuinely needed.
-- Dividers are `StyleSheet.hairlineWidth`, never 1px — use the shared `<Divider />`.
-- **Dramatic**, not incremental, type hierarchy: 34 / 28 / 20 / 17 / 13 / 11, each with a
-  distinct job and weight. No stack of 17/15/14/13 that all read the same.
-- All monetary values render with `tabular` (`fontVariant: ['tabular-nums']`) so figures align.
-- Currency is declared **once per section header** (`USD`); line items show bare figures.
-  `formatAmount` is the default, `formatMoney` (with `$`) only for standalone figures outside
-  such a header — currently just the persisted labour label in `quote-payload.ts`.
-- Labels that restate the obvious are dropped — e.g. the Summary grand total has **no "Total"
-  label**; it's the largest figure on the screen, alone below a rule after two subtotals.
-- Micro-labels: 11px, uppercase, `letterSpacing` 0.9 (~0.08em), `muted`.
-- Corner radius: **8** on controls and buttons (`Radius.control`), 12 only for genuinely
-  sheet/tile-like surfaces (`Radius.sheet`). Nothing is uniformly large-radius.
+**Shared primitives** (`src/components/`):
 
-**Shared primitives added:** `<Divider />`, and `PrimaryButton` / `SecondaryButton` /
-`TextButton` in `src/components/button.tsx` — so button hierarchy is enforced centrally rather
-than re-implemented per screen.
+- `Key` (`button.tsx`) — the physical key every pressable is built on. `chassis` / `accent` /
+  `ghost` variants; press = 2pt travel + shadow flip over a sprung 150ms curve (Reanimated CSS
+  transitions) + a light haptic (`lib/haptics.ts`). `latched` holds it down — use for chips,
+  toggles, segments. `PrimaryButton` / `SecondaryButton` / `TextButton` wrap it, same props as before.
+- `Panel` (`panel.tsx`) — bolted module: chassis fill, `card` shadow (`elevated` → `floating`),
+  corner `Screw`s 12pt from each edge (on by default), optional `Vents`.
+- `DataInput` (`data-input.tsx`) — recessed mono well, 56pt min height, accent focus
+  "backlight" ring, `danger` ring on error, optional `suffix`. `AuthField` = label + DataInput + error.
+- `Led` (`led.tsx`) — status light with mono legend; `accent` / `success` / `warning` / `off`,
+  optional `pulse`. Always labelled, so status is never colour-only.
+- `Divider` — now a machined groove (dark upper lip, lit lower lip), not a hairline.
+- `Readout` / `ReadoutText` (`readout.tsx`) — a backlit "device screen": dark glass in a
+  recessed bezel with CRT scanlines. Fixed `ScreenColors` (a lit screen looks the same in
+  light and dark mode). At most one per screen.
+- `QuoteListPanel` (`quote-list.tsx`) — the saved-quotes list on a panel with its header and
+  loading / error / empty states; shared by Home and the Quotes tab.
+
+**Carried over:** no card-in-card; currency declared once per section header (`USD`) with bare
+figures below; labels that restate the obvious are dropped; ≥48pt touch targets.
+**Adapted for mobile:** hover states become press states; the spec's external texture images
+(carbon fibre, noise) are left out — a phone app shouldn't depend on a third-party URL.
+Icons: `lucide-react-native` (installed, first used in section 3/4).
 
 ## Decisions log
+
+- **2026-09-18:** **Redesign to Industrial Skeuomorphism — section 1 (foundation).** Maintainer
+  decisions: build on SDK 57; **keep a dark variant** (charcoal panel) rather than going
+  light-only as the spec says; add `expo-haptics`, `lucide-react-native` (+ `react-native-svg`),
+  `@expo-google-fonts/inter` + `/jetbrains-mono`; **keep the native tab bar** and only recolour it.
+  - Shadows are plain `boxShadow` strings, not a shadow library — RN 0.86 renders layered and
+    inset shadows natively.
+  - Fonts are imported per weight (`@expo-google-fonts/inter/700Bold`), not from the package
+    root, which would bundle all 18 weights. 6 files ship.
+  - `src/global.css` deleted — it only fed the old web `Fonts` map.
+  - Navigation theme is painted in chassis colours so transitions don't flash white.
+- **2026-09-18:** **Redesign section 2 — login + sign-up.** Both screens: `Nameplate` (power LED
+  + stamped brand) → embossed title on the chassis → the form as one screwed/vented `Panel`
+  ending in the red key → `AuthSwitchLink` (shared in `components/auth-chrome.tsx`).
+  - The power LED deliberately isn't labelled "online" — we can't know that before a request.
+  - Offline notice is now its own panel with a pulsing amber **OFFLINE** LED (still not an
+    error style). Retry logic untouched.
+  - Contractor/Homeowner is a pair of latching `Key`s with an indicator LED each; selection is
+    also exposed as `accessibilityState.selected`, so it's never colour-only.
+  - Switch link is ink + bold + underlined, not accent: `#FF4757` fails contrast as 13pt text.
+  - **Login now scrolls** (was a fixed centred view) — the panel made it tall enough to clip
+    on short phones with the keyboard up. Still centred when there's room.
+- **2026-09-18:** **Redesign section 3 — Home, Quotes, dialog, tab bar.**
+  - Home: nameplate strip (power LED + ghost Sign-out key) → headline → an elevated, vented
+    "control module" panel holding a `Readout` of the **latest quote** (`formatMoney`, since no
+    USD header sits above it) and the red Start key → `QuoteListPanel`.
+  - Quote rows are ghost `Key`s (sink into a well + haptic when pressed) with a lucide chevron;
+    drafts carry an amber **DRAFT** LED instead of a bare label. Totals render in mono.
+  - Loading/error/empty handling for both lists moved into `QuoteListPanel`. Behaviour change:
+    the Quotes tab now shows its "All quotes" header in every state (was: only with rows).
+  - `QuoteActionsDialog`: elevated `Panel` over a charcoal scrim, name field is a `DataInput`.
+    Logic untouched.
+  - Native tab bar tinted only (still `NativeTabs`): chassis background, accent icon when
+    selected, Inter labels. Now reads colours via `useTheme()` instead of its own lookup.
 
 - **2026-09-18:** **Upgraded SDK 54 → 57, and migrated off react-navigation rather than
   suppressing the check.** Not a chosen upgrade — Expo Go auto-updated itself on the
@@ -349,10 +417,31 @@ than re-implemented per screen.
 - [x] **Offline cold launch explains itself on the login screen** (2026-08-16, device-verified)
 - [x] **Expo SDK 54 → 57**, migrated off react-navigation (2026-09-18, static checks only)
 - [x] **Lint and typecheck both clean** under the SDK 57 React Compiler rules (2026-09-18)
+- [ ] **Industrial Skeuomorphism redesign** — sections 1–3/5 (foundation, auth, tabs) done 2026-09-18
+  (typecheck, lint, iOS+Android `expo export` clean; not yet seen on device)
 
-### ⚠️ Verification state (updated 2026-08-16)
+### Verification state (updated 2026-09-18)
 
-**Device-verified 2026-08-16** (14-step run with Directus stopped and restarted on the
+**Device-verified 2026-09-18.** The maintainer ran the full smoke test on the phone after
+the SDK 57 migration and redesign sections 1–3 and reported everything working. Recorded as
+a pass over the list below rather than a step-by-step log — the granularity of the
+2026-08-16 entry below is not claimed here:
+
+- **Edit-flow hydration** — tap a saved quote → Edit the full quote → change a dimension →
+  Save changes. This closes the longest-standing gap in this doc: the latch had been
+  written (2026-07-27) and rewritten (2026-09-18, ref → state-during-render) without ever
+  being executed. It works.
+- **Delete** a quote from the actions dialog, and **exit a wizard part-way via the close ✕**.
+- **`QuoteActionsDialog`** on a real keyboard, and the **Quotes tab**, both opened for the
+  first time.
+- **The SDK 57 navigation swap** — gate, tabs, and `/new-quote` presenting as a modal over
+  the tabs — behaves as it did on SDK 54. expo-router's move off react-navigation is
+  invisible at runtime, as the migration guide said it would be.
+- **Redesign sections 1–3** (foundation, auth screens, Home/Quotes tabs + rows + dialog +
+  tab tint) seen on a device for the first time.
+
+
+**Previously device-verified 2026-08-16** (14-step run with Directus stopped and restarted on the
 devbox — not airplane mode, which prevents a dev build from fetching its bundle at all):
 
 - The offline notice, its Try-again while still offline, and Try-again after reconnecting
@@ -366,23 +455,15 @@ devbox — not airplane mode, which prevents a dev build from fetching its bundl
   rendered on a device.
 - Home's error note and pull-to-refresh.
 
-**Still unverified from 2026-07-27** — typecheck, lint and `expo export` only:
+**Cleared 2026-09-18.** The four items carried here since 2026-07-27 — edit-flow
+hydration, `QuoteActionsDialog` on a real keyboard, the close ✕ against a real safe-area
+inset, and the Quotes tab — have all now been exercised on a device. Nothing from that
+list is outstanding.
 
-1. **Edit-flow hydration** (`(quote)/_layout.tsx`) — latches the quote id from
-   `useGlobalSearchParams` because later steps carry no params. Reasoned through, never
-   run. If wrong, "Edit the full quote" shows a blank wizard or spins forever.
-   ⚠️ **Rewritten on 2026-09-18** (ref → state set during render) to clear the
-   `react-hooks/refs` errors. The latch semantics were deliberately preserved and it
-   typechecks, lints and bundles — but this is still never-run code, and it has now been
-   edited twice without ever being executed. Highest-priority smoke test.
-2. **`QuoteActionsDialog`** — `Modal` + `autoFocus` + `KeyboardAvoidingView` is fiddly on
-   iOS; the keyboard may cover the buttons.
-3. **The close ✕ control** — positioned with negative margins to sit inside the header
-   padding; easy to get wrong against a real safe-area inset.
-4. **The Quotes tab** — not opened during the 08-16 run.
-
-Remaining smoke test for those: tap a saved quote → edit → change a dimension → Save
-changes; tap → delete; and exit a wizard part-way via ✕.
+**Still unverified:** redesign **section 4** (quote wizard chrome + the five steps) and
+**section 5** are not built yet; the wizard currently renders with the new tokens over the
+old layouts, which is the expected intermediate state, not a regression. Web has not been
+re-checked since the redesign began.
 
 ### Known open UI items
 
