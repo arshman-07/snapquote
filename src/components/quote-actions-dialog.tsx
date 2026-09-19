@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -62,9 +62,16 @@ export function QuoteActionsDialog({
   // Re-seed each time the dialog opens for a (possibly different) quote — the
   // component stays mounted between openings, so state would otherwise be
   // whatever the last edit left behind.
-  useEffect(() => {
+  //
+  // Adjusted during render rather than in an effect: the effect version
+  // committed one render showing the *previous* quote's name and corrected it
+  // on a second pass. Tracking the last `visible` we reacted to keeps this to
+  // the open transition only, so the user's typing is never clobbered.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
     if (visible) setName(initialName);
-  }, [visible, initialName]);
+  }
 
   return (
     <Modal

@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Divider } from '@/components/divider';
@@ -45,7 +45,7 @@ export default function DimensionsScreen() {
   // RHF owns the form locally, seeded from the draft so values survive
   // back-navigation into this step. It only writes back to the shared draft on a
   // valid Continue.
-  const { control, handleSubmit, watch, setValue, formState } = useForm<DimensionsForm>({
+  const { control, handleSubmit, setValue, formState } = useForm<DimensionsForm>({
     resolver: zodResolver(dimensionsSchema),
     mode: 'onChange',
     defaultValues: {
@@ -59,11 +59,13 @@ export default function DimensionsScreen() {
   });
 
   // Watched values drive this screen's live chrome (overline + area preview).
-  const unit = watch('unit');
-  const jobType = watch('jobType');
-  const jobTypeId = watch('jobTypeId');
-  const length = watch('length');
-  const width = watch('width');
+  // `useWatch` rather than `watch()`: the latter reads react-hook-form's mutable
+  // store during render, which makes the React Compiler bail out and skip
+  // optimising this whole component. `useWatch` subscribes as a proper hook.
+  const [unit, jobType, jobTypeId, length, width] = useWatch({
+    control,
+    name: ['unit', 'jobType', 'jobTypeId', 'length', 'width'],
+  });
 
   const l = parseDimension(length);
   const w = parseDimension(width);

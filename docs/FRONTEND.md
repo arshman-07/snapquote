@@ -4,7 +4,7 @@
 
 ## Stack
 
-- **Framework:** Expo / React Native (Expo SDK 54)
+- **Framework:** Expo / React Native (**Expo SDK 57**, since 2026-09-18 — see AGENTS.md)
 - **Routing:** Expo Router (file-based, `src/app/`)
 - **Styling:** Theme tokens (`src/constants/theme.ts`) + `ThemedText` / `ThemedView` primitives,
   with `StyleSheet.create` per screen. **No NativeWind, no Tailwind, no UI kit** — see the
@@ -116,6 +116,54 @@ screen. `danger` is exempt (a validation error must be able to appear anywhere).
 than re-implemented per screen.
 
 ## Decisions log
+
+- **2026-09-18:** **Upgraded SDK 54 → 57, and migrated off react-navigation rather than
+  suppressing the check.** Not a chosen upgrade — Expo Go auto-updated itself on the
+  maintainer's phone, which is the only test device, so the project had to follow the same
+  day. `npx expo install expo@^57` + `--fix` took RN 0.81→0.86, React 19.1→19.2,
+  TypeScript 5.9→6.0 and expo-router 6→57.
+  - **The breaking change is narrower than it first looks.** SDK 56 dropped expo-router's
+    `@react-navigation/*` dependencies for a native implementation, and app code may no
+    longer import from them — but *the runtime API is unchanged*. `Stack`,
+    `Stack.Protected`, `NativeTabs` and the rest needed no changes at all. Exactly one app
+    import broke: the themes in `src/app/_layout.tsx`.
+  - Migrated to the **`expo-router` root export**, not the `expo-router/react-navigation`
+    compat entry the migration guide's table points at — the compat entry has all three
+    symbols but marks each `@deprecated`, for removal in a future SDK.
+  - `@react-navigation/native`, `/bottom-tabs` and `/elements` removed from
+    `package.json`. Nothing outside the react-navigation cluster depended on them.
+  - `EXPO_ROUTER_DISABLE_RN_NAVIGATION_CHECK=1` deliberately **not** used. All three
+    platforms bundle clean without it.
+  - Unrelated fallout from RN 0.86: `StyleSheet.absoluteFillObject` is gone from both the
+    types and the runtime. `absoluteFill` is now that plain object, so the spread in
+    `animated-icon.tsx` swapped one-for-one.
+  - **The 6 pre-existing `app-tabs.tsx` typecheck errors are fixed by the upgrade** — the
+    `expo-router@57` types have `NativeTabs.Trigger.Label`/`.Icon`. Typecheck is at zero
+    for the first time since 2026-08-16, so it is a usable green light again.
+
+- **2026-09-18:** **Cleared the 13 new React Compiler lint errors instead of relaxing the
+  rules.** `eslint-config-expo@57` ships `eslint-plugin-react-hooks@7`, whose
+  compiler-aware rules didn't exist under the old config. Notably these were not noise —
+  10 of the 13 landed on `(quote)/_layout.tsx`, the edit-flow id latch this doc already
+  flagged as the riskiest never-run code, and `reactCompiler: true` is on.
+  - `(quote)/_layout.tsx` — `editIdRef` → state set during render behind an
+    `editId === null` guard. Kept the original "latch the id the **first time it is
+    seen**, on whichever render that happens" semantics; a `useState` lazy initializer
+    would only read the first render and would silently break edit if the param arrives
+    later.
+  - `quote-actions-dialog.tsx` — re-seed effect → adjust-state-during-render. Also fixes a
+    real one-frame bug: the effect committed the *previous* quote's name and corrected it
+    on a second pass. Narrowed to the closed→open transition, so a mid-edit `initialName`
+    change can no longer clobber the user's typing.
+  - `use-color-scheme.web.ts` — hydration flag → `useSyncExternalStore` (`false` server
+    snapshot, `true` client), which is what React provides for this static-render split.
+  - `auth.tsx` — the only change made purely to satisfy the linter. Every `setStatus` in
+    `restoreSession` already happens after an `await`; the rule can't see through the
+    call. Probing the rule showed `void f()` and `f().catch()` are both flagged while
+    `void (async () => { await f(); })()` passes. Behaviour identical.
+  - `new-quote.tsx` — five `watch()` reads → one `useWatch({ control, name: [...] })`.
+    `watch()` reads RHF's mutable store during render, which made the compiler skip
+    optimising the whole screen.
 
 - **2026-08-16:** **A cold launch with no server explains itself instead of demanding a
   password** (OPEN-QUESTIONS #7). The four offline fallbacks below the gate were fine; the
@@ -299,6 +347,8 @@ than re-implemented per screen.
 - [x] **Quotes are nameable, editable and deletable** (2026-07-27)
 - [x] Quote flow can be exited early with a discard confirm (2026-07-27)
 - [x] **Offline cold launch explains itself on the login screen** (2026-08-16, device-verified)
+- [x] **Expo SDK 54 → 57**, migrated off react-navigation (2026-09-18, static checks only)
+- [x] **Lint and typecheck both clean** under the SDK 57 React Compiler rules (2026-09-18)
 
 ### ⚠️ Verification state (updated 2026-08-16)
 
@@ -321,6 +371,10 @@ devbox — not airplane mode, which prevents a dev build from fetching its bundl
 1. **Edit-flow hydration** (`(quote)/_layout.tsx`) — latches the quote id from
    `useGlobalSearchParams` because later steps carry no params. Reasoned through, never
    run. If wrong, "Edit the full quote" shows a blank wizard or spins forever.
+   ⚠️ **Rewritten on 2026-09-18** (ref → state set during render) to clear the
+   `react-hooks/refs` errors. The latch semantics were deliberately preserved and it
+   typechecks, lints and bundles — but this is still never-run code, and it has now been
+   edited twice without ever being executed. Highest-priority smoke test.
 2. **`QuoteActionsDialog`** — `Modal` + `autoFocus` + `KeyboardAvoidingView` is fiddly on
    iOS; the keyboard may cover the buttons.
 3. **The close ✕ control** — positioned with negative margins to sit inside the header
@@ -338,9 +392,8 @@ changes; tap → delete; and exit a wizard part-way via ✕.
 - **App identity is still Expo's** — icon, splash, favicon, the Quotes tab icon, and
   `app.json` `slug`/`scheme` (`"mobile"`). A branding pass was explicitly deferred.
 - **Sign-out button overlaps the web tab bar** (web only; fine on native).
-- **`npx tsc --noEmit` fails with 6 errors in `src/components/app-tabs.tsx`** (found
-  2026-08-16, pre-existing — reproduced on a clean `85e442e` tree). `NativeTabs.Trigger.Label`
-  and `.Icon` don't exist on the installed `expo-router@6.0.24` types, which expose only
-  `.TabBar` on `Trigger`. Native tabs render fine on-device, so this is a types/API-shape
-  mismatch rather than a runtime break — but it means "typecheck is clean" can no longer be
-  used as a green light. Untouched so far; needs the SDK 54 native-tabs docs.
+- ~~**`npx tsc --noEmit` fails with 6 errors in `src/components/app-tabs.tsx`**~~
+  **Fixed by the SDK 57 upgrade (2026-09-18).** The errors were a types/API-shape mismatch:
+  `NativeTabs.Trigger.Label`/`.Icon` didn't exist on `expo-router@6.0.24`'s types, which
+  exposed only `.TabBar` on `Trigger`. The `expo-router@57` types have them. Typecheck is
+  clean again and can be used as a green light.

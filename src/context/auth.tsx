@@ -120,8 +120,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Launch restore. The root layout holds the splash until this resolves.
+  //
+  // Awaited inside an async IIFE rather than called bare: every `setStatus` in
+  // `restoreSession` already happens after an await, but the lint rule can only
+  // see that boundary if it is written out here. Behaviour is unchanged — the
+  // effect still returns synchronously and the promise is still unhandled by
+  // design (`restoreSession` swallows its own errors).
   useEffect(() => {
-    void restoreSession();
+    void (async () => {
+      await restoreSession();
+    })();
   }, [restoreSession]);
 
   const signIn = useCallback(async (email: string, password: string) => {

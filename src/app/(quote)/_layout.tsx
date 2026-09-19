@@ -1,5 +1,5 @@
 import { Stack, useGlobalSearchParams } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -38,12 +38,20 @@ function QuoteFlow() {
 
   // Latch the id from the entry URL. Later steps (/photo, /materials, …) carry
   // no params, so reading it live would lose it the moment the user advances.
-  const editIdRef = useRef<number | null>(null);
-  if (editIdRef.current === null && params.id) {
-    const parsed = Number(params.id);
-    if (Number.isFinite(parsed)) editIdRef.current = parsed;
+  //
+  // Held in state rather than a ref because a ref may not be read or written
+  // during render — with `reactCompiler` on, the compiler is free to memoize
+  // around one. Setting state during render is the sanctioned alternative:
+  // React discards this render and immediately re-runs the component with the
+  // new value, before anything is committed. The `editId === null` guard is
+  // what stops that from looping, and it preserves the original semantics —
+  // latch the id the first time it is seen, on whichever render that happens,
+  // rather than only on the first.
+  const [editId, setEditId] = useState<number | null>(null);
+  const parsedId = params.id ? Number(params.id) : NaN;
+  if (editId === null && Number.isFinite(parsedId)) {
+    setEditId(parsedId);
   }
-  const editId = editIdRef.current;
 
   const quoteQuery = useQuote(editId);
 

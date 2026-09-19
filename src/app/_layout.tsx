@@ -1,6 +1,9 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
+// SDK 56+ : expo-router no longer depends on react-navigation, and app code may
+// not import from `@react-navigation/*`. The themes and provider are re-exported
+// from `expo-router` itself. (The `expo-router/react-navigation` compat entry
+// also has them, but marks them deprecated for removal in a future SDK.)
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import React from 'react';
 import { useColorScheme } from 'react-native';
 
