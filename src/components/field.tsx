@@ -1,4 +1,5 @@
-import { StyleSheet, View, type TextInputProps } from 'react-native';
+import { type Ref } from 'react';
+import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
 import { DataInput } from '@/components/data-input';
 import { ThemedText } from '@/components/themed-text';
@@ -18,6 +19,10 @@ export function Field({
   error?: string;
   /** Unit or hint printed at the end of the slot ("ft", "/ day"). */
   suffix?: string;
+  /** Forwarded to the TextInput (e.g. to focus it from the previous field). */
+  ref?: Ref<TextInput>;
+  /** Focus the next field — see `DataInput`. */
+  onNext?: () => void;
 }) {
   return (
     <View style={styles.field}>

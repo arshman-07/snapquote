@@ -1,7 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
+import { useRef } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, TextInput, View } from 'react-native';
 
 import { Chip } from '@/components/chip';
 import { Field } from '@/components/field';
@@ -34,6 +35,10 @@ function parseDimension(raw: string): number | null {
 export default function DimensionsScreen() {
   const router = useRouter();
   const { draft, updateDraft } = useQuoteDraft();
+
+  // Keyboard "Next" walks length → width → height; height's key is "Done".
+  const widthRef = useRef<TextInput>(null);
+  const heightRef = useRef<TextInput>(null);
 
   // Room types come from Directus. While loading we show a spinner; on error /
   // offline we fall back to the static list so a quote can always be started.
@@ -150,6 +155,7 @@ export default function DimensionsScreen() {
               label="Length"
               value={field.value}
               onChangeText={field.onChange}
+              onNext={() => widthRef.current?.focus()}
               keyboardType="decimal-pad"
               placeholder="0"
               suffix={unit}
@@ -162,9 +168,11 @@ export default function DimensionsScreen() {
           name="width"
           render={({ field, fieldState }) => (
             <Field
+              ref={widthRef}
               label="Width"
               value={field.value}
               onChangeText={field.onChange}
+              onNext={() => heightRef.current?.focus()}
               keyboardType="decimal-pad"
               placeholder="0"
               suffix={unit}
@@ -177,9 +185,11 @@ export default function DimensionsScreen() {
           name="height"
           render={({ field, fieldState }) => (
             <Field
+              ref={heightRef}
               label="Height (optional)"
               value={field.value}
               onChangeText={field.onChange}
+              returnKeyType="done"
               keyboardType="decimal-pad"
               placeholder="0"
               suffix={unit}
