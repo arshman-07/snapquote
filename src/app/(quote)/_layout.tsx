@@ -53,14 +53,33 @@ function QuoteFlow() {
     setEditId(parsedId);
   }
 
+  // Remember that the latched quote has been loaded into the draft, once, for
+  // good. We can't just compare `editingId` to `editId` for this: leaving the
+  // flow ("Save changes", Close/Discard) calls `reset()`, which puts
+  // `editingId` back to null while `editId` stays latched. Keyed off
+  // `editingId` alone, that would flip the layout back to the spinner —
+  // unmounting the steps mid-dismiss — and re-hydrate the old quote into a
+  // flow that's closing. Same set-state-during-render pattern as `editId`; the
+  // `hydratedId !== editId` guard stops it looping.
+  //
+  // This never needs clearing: the (quote) group is a screen of the root
+  // Stack, and `dismissTo('/')` pops it, so this layout (and its draft
+  // provider) unmounts on exit. Every entry — new or edit — mounts fresh.
+  const [hydratedId, setHydratedId] = useState<number | null>(null);
+  if (editId !== null && editingId === editId && hydratedId !== editId) {
+    setHydratedId(editId);
+  }
+
   const quoteQuery = useQuote(editId);
 
+  // Seed the draft from the saved quote exactly once. Guarding on `hydratedId`
+  // (not `editingId`) is what keeps a later `reset()` from triggering a reload.
   useEffect(() => {
     const quote = quoteQuery.data;
-    if (quote && editingId !== quote.id) hydrate(draftFromQuote(quote), quote.id);
-  }, [quoteQuery.data, editingId, hydrate]);
+    if (quote && hydratedId !== quote.id) hydrate(draftFromQuote(quote), quote.id);
+  }, [quoteQuery.data, hydratedId, hydrate]);
 
-  const awaitingHydration = editId !== null && editingId !== editId;
+  const awaitingHydration = editId !== null && hydratedId !== editId;
 
   if (awaitingHydration) {
     return (
