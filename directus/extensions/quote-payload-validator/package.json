@@ -1,0 +1,13 @@
+{
+  "name": "directus-extension-quote-payload-validator",
+  "version": "1.0.0",
+  "description": "Rejects quotes/quote_items writes whose values fall outside the app's contract.",
+  "private": true,
+  "type": "module",
+  "directus:extension": {
+    "type": "hook",
+    "path": "index.js",
+    "source": "index.js",
+    "host": "^11.0.0"
+  }
+}

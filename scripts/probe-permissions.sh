@@ -110,7 +110,12 @@ CREATED_ITEM="$(first_id < "$TMP")"
 echo
 echo "== Group C: App User A — cross-user & privilege (must be denied) =="
 probe "GET B's quote by id"                     403\|404 GET   "/items/quotes/$QUOTE_B"      "$TOKEN_A"
-probe "PATCH B's quote"                          403\|404 PATCH "/items/quotes/$QUOTE_B"      "$TOKEN_A" '{"grand_total":0}'
+# The payload must pass quote-payload-validator: Directus runs items.update
+# filter hooks BEFORE the access check, so a payload the validator rejects
+# (e.g. a lone grand_total) returns 400 and never reaches ownership scoping.
+# job_type is free text and A may update it on their own quotes (see "PATCH own
+# quote" above), so a 403/404 here can only come from the row-level scoping.
+probe "PATCH B's quote"                          403\|404 PATCH "/items/quotes/$QUOTE_B"      "$TOKEN_A" '{"job_type":"x"}'
 # Was the open gap found 2026-07-26 (returned 200 — create rules can't traverse
 # quote.user_created). Enforced by the quote-item-owner-guard hook extension
 # (directus/README.md); these two FAIL until it is deployed on the devbox.
@@ -227,17 +232,70 @@ if [[ -z "$FIELD_TARGET" ]]; then
 else
   # Every field the wizard writes back on save. Keep in step with
   # buildQuotePayload() in src/lib/quote-payload.ts.
+  #
+  # Some fields can't be PATCHed alone without the quote-payload-validator
+  # rejecting them with a 400 (which would read as a permission failure here):
+  # a dimension needs `unit` in the same payload, and the three totals must
+  # travel together with grand = materials + labour. Those entries carry their
+  # companions after the named field's value, so the probe is still labelled
+  # (and still exercises Update) for the field it's named after.
   for entry in \
-    'customer_name:"probe"' 'job_type:"probe"' 'length:1' 'width:1' 'height:1' 'unit:"ft"' \
+    'customer_name:"probe"' 'job_type:"probe"' \
+    'length:1,"unit":"ft"' 'width:1,"unit":"ft"' 'height:1,"unit":"ft"' 'unit:"ft"' \
     'material_brief:"probe"' 'material_zip:"00000"' 'selected_tier:"standard"' \
-    'materials_total:1' 'labour_days:1' 'labour_day_rate:1' 'labour_total:1' \
-    'grand_total:1' 'status:"draft"'
+    'materials_total:1,"labour_total":1,"grand_total":2' 'labour_days:1' 'labour_day_rate:1' \
+    'labour_total:1,"materials_total":1,"grand_total":2' \
+    'grand_total:2,"materials_total":1,"labour_total":1' 'status:"draft"'
   do
     fname="${entry%%:*}"; fval="${entry#*:}"
     probe "UPDATE $fname" 200 PATCH "/items/quotes/$FIELD_TARGET" "$TOKEN_A" "{\"$fname\":$fval}"
   done
   curl -s -o /dev/null -X DELETE -H "Authorization: Bearer $TOKEN_A" "$BASE_URL/items/quotes/$FIELD_TARGET"
 fi
+
+echo
+echo "== Group G: payload validation (quote-payload-validator extension) =="
+# SECURITY.md §2.5. Client-side zod is UX; these probe the server-side rules.
+#
+# A 200 where 400 is expected means the extension is NOT loaded on the box, not
+# that the rule is wrong — treat it as a deployment failure and check the
+# Directus logs. Unit-level coverage of the same rules, with no server
+# involved, is `node scripts/test-payload-validator.mjs`.
+#
+# The accept probe comes first and matters most: it is the regression check
+# that the validator has not started blocking legitimate saves. A guard that
+# only ever denies would pass every deny probe below and still break the app.
+VALID_QUOTE='{"customer_name":"probe","job_type":"probe","length":12,"width":10,"height":8,"unit":"ft","material_brief":"probe","material_zip":"07030","selected_tier":"standard","materials_total":2480.5,"labour_days":3,"labour_day_rate":450,"labour_total":1350,"grand_total":3830.5,"status":"draft"}'
+VALID_TARGET="$(curl -s -X POST -H "Authorization: Bearer $TOKEN_A" -H 'Content-Type: application/json' -d "$VALID_QUOTE" "$BASE_URL/items/quotes?fields=id" | first_id)"
+if [[ -n "$VALID_TARGET" ]]; then
+  printf '  [32mPASS[0m  %-52s -> 200
+' "POST full valid wizard payload"
+  ((pass++))
+  curl -s -o /dev/null -X DELETE -H "Authorization: Bearer $TOKEN_A" "$BASE_URL/items/quotes/$VALID_TARGET"
+else
+  printf '  [31mFAIL[0m  %-52s -> rejected a legitimate save
+' "POST full valid wizard payload"
+  ((fail++))
+fi
+probe "POST minimal quote (job_type + unit only)"  200 POST "/items/quotes?fields=id" "$TOKEN_A" '{"job_type":"probe-valid","unit":"ft"}'
+
+# Deny cases. None of these create a row, so there is nothing to clean up.
+probe "POST quote, missing job_type"           400 POST /items/quotes "$TOKEN_A" '{"unit":"ft"}'
+probe "POST quote, bogus unit"                 400 POST /items/quotes "$TOKEN_A" '{"job_type":"x","unit":"cubits"}'
+probe "POST quote, bogus status"               400 POST /items/quotes "$TOKEN_A" '{"job_type":"x","unit":"ft","status":"approved"}'
+probe "POST quote, bogus tier"                 400 POST /items/quotes "$TOKEN_A" '{"job_type":"x","unit":"ft","selected_tier":"deluxe"}'
+probe "POST quote, negative grand_total"        400 POST /items/quotes "$TOKEN_A" '{"job_type":"x","unit":"ft","grand_total":-5}'
+probe "POST quote, dimension out of range"      400 POST /items/quotes "$TOKEN_A" '{"job_type":"x","unit":"ft","length":5000}'
+probe "POST quote, totals disagree"             400 POST /items/quotes "$TOKEN_A" '{"job_type":"x","unit":"ft","materials_total":10,"labour_total":10,"grand_total":999}'
+probe "POST quote, oversized material_brief"    400 POST /items/quotes "$TOKEN_A" "{\"job_type\":\"x\",\"unit\":\"ft\",\"material_brief\":\"$(printf 'A%.0s' $(seq 1 6000))\"}"
+probe "PATCH quote, negative total"             400 PATCH "/items/quotes/$QUOTE_A" "$TOKEN_A" '{"grand_total":-1}'
+probe "PATCH quote, oversized customer_name"    400 PATCH "/items/quotes/$QUOTE_A" "$TOKEN_A" "{\"customer_name\":\"$(printf 'A%.0s' $(seq 1 300))\"}"
+probe "POST item, negative amount"              400 POST /items/quote_items "$TOKEN_A" "{\"kind\":\"labour\",\"label\":\"x\",\"amount\":-1,\"quote\":$QUOTE_A}"
+probe "POST item, bogus kind"                   400 POST /items/quote_items "$TOKEN_A" "{\"kind\":\"consulting\",\"label\":\"x\",\"amount\":1,\"quote\":$QUOTE_A}"
+
+# The valid minimal quote above is a real row; remove it.
+VALID_MINIMAL="$(curl -s -H "Authorization: Bearer $TOKEN_A" "$BASE_URL/items/quotes?limit=1&sort=-id&filter[job_type][_eq]=probe-valid&fields=id" | first_id)"
+[[ -n "$VALID_MINIMAL" ]] && curl -s -o /dev/null -X DELETE -H "Authorization: Bearer $TOKEN_A" "$BASE_URL/items/quotes/$VALID_MINIMAL"
 
 echo
 echo "== Cleanup =="

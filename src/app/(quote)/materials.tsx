@@ -22,6 +22,11 @@ import { Radius, Spacing } from '@/constants/theme';
 import { getArea, useQuoteDraft } from '@/context/quote-draft';
 import { useShadows, useTheme } from '@/hooks/use-theme';
 
+// Mirrors MAX_TEXT.material_brief in directus/extensions/quote-payload-validator.
+// The server rejects a longer brief with a 400 on every save, so the field stops
+// input at the same cap. Both sides count raw, untrimmed string length.
+const MAX_BRIEF_LENGTH = 5000;
+
 // Step 3 — Materials. The user describes the work, then we present three
 // itemized packages (Budget / Standard / Premium) to choose from. In Phase 1
 // the options come from a deterministic mock; Phase 3 swaps in a Directus call
@@ -76,6 +81,7 @@ export default function MaterialsScreen() {
         onChangeText={(materialBrief) => updateDraft({ materialBrief })}
         placeholder={briefPlaceholder(draft.jobType)}
         multiline
+        maxLength={MAX_BRIEF_LENGTH}
       />
 
       {/* Optional ZIP — regional pricing once the lookup is real. */}
