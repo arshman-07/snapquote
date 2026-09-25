@@ -49,9 +49,14 @@ export default function LoginScreen() {
     setRetrying(true);
     setRetryFailed(false);
     setServerError(null);
-    const restored = await retryRestore();
-    if (!restored) {
-      setRetryFailed(true);
+    // `finally` so the button always leaves its "Trying…" state — on success
+    // the gate unmounts this screen anyway, and on any failure (including one
+    // `retryRestore` doesn't already handle internally) we still want control
+    // back rather than a stuck disabled button.
+    try {
+      const restored = await retryRestore();
+      if (!restored) setRetryFailed(true);
+    } finally {
       setRetrying(false);
     }
   }

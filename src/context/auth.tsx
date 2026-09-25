@@ -86,7 +86,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // expires_at in storage), so we do it explicitly.
   const restoreSession = useCallback(async (): Promise<boolean> => {
     // No persisted refresh token (fresh install / after logout): skip the
-    // doomed network round-trip.
+    // doomed network round-trip. `authStorage.get()` never rejects — a
+    // storage-layer fault (see auth-storage.ts) degrades to "nothing
+    // stored" here rather than throwing, so this always reaches a verdict.
     const stored = await authStorage.get();
     if (!stored?.refresh_token) {
       if (mountedRef.current) {
@@ -183,6 +185,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Server unreachable or token already dead; local cleanup below.
     } finally {
+      // Never rejects (see auth-storage.ts) even if the device can't persist
+      // the clear, so the rest of this teardown always runs.
       await authStorage.set(null);
       queryClient.clear();
       // An explicit sign-out is not an offline session — the token is gone, so
