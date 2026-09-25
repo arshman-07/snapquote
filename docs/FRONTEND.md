@@ -52,6 +52,10 @@
   values (area, materials/labour/total) are exported helpers alongside it.
 - **Shared UI:** `quote-step-screen` (chrome), `step-progress` (the "Step N of 5" bar), `step-footer`
   (Back / primary action). Sample data + USD (`$`) formatting live in `src/constants/quote.ts`.
+- **Keyboard:** `quote-step-screen` provides `KeyboardRevealContext`
+  (`src/components/keyboard-reveal.tsx`) — any `DataInput` on a step scrolls itself clear of the
+  keyboard when focused. Chain fields with `ref` + `onNext` (Dimensions: Length → Width →
+  Height). See the 2026-09-18 keyboard entry in the Decisions log.
 
 ## Navigation
 
@@ -65,7 +69,7 @@
   still `"mobile"` (affects the browser tab title + native app label — cross-platform, left for a
   dedicated branding pass), plus the app icon / splash / favicon assets.
 
-## Design system — Industrial Skeuomorphism (2026-09-18, migration in progress)
+## Design system — Industrial Skeuomorphism (2026-09-18)
 
 Direction: **the app is a physical device.** A matte plastic chassis (the page), panels bolted
 onto it, keys that depress, data slots recessed into the surface, LEDs for status. Replaces the
@@ -76,11 +80,10 @@ onto it, keys that depress, data slots recessed into the surface, LEDs for statu
 1. ✅ **Foundation** (tokens, fonts, shared primitives) — 2026-09-18
 2. ✅ **Login + sign-up** — 2026-09-18
 3. ✅ **Home + Quotes tabs, quote rows, actions dialog, native tab bar recolour** — 2026-09-18
-4. ⬜ Quote wizard chrome (pipe progress, footer, close) + the five steps
-5. ⬜ Splash colours, remove the `Radius.control`/`sheet` aliases, final doc pass
+4. ✅ **Quote wizard chrome (pipe progress, close key) + all five steps** — 2026-09-18
+5. ✅ **Splash colours, legacy token removal, final doc pass** — 2026-09-18
 
-Until a section lands, its screens render with the new tokens but the old layouts (flat
-`surface` inputs, hairline chips) — expected, not a regression.
+Sections 4–5 are static-check verified only — see Verification state.
 
 **Light physics.** One light source, **top-left at 45°**: highlights on top/left edges, shadows
 bottom/right. Every depth effect is a `boxShadow` string (native on the New Architecture):
@@ -100,7 +103,6 @@ bottom/right. Every depth effect is a `boxShadow` string (native on the New Arch
 | Token | Light | Dark | Use |
 |---|---|---|---|
 | `background` | `#E0E5EC` | `#2B3036` | chassis — the page and every panel/key face |
-| `surface` | `#F0F2F5` | `#343A42` | lighter raised face, sparingly |
 | `recessed` | `#D1D9E6` | `#23272C` | sunken wells |
 | `ink` | `#2D3436` | `#E0E5EC` | primary text |
 | `body` | `#4A5568` | `#A8B2D1` | secondary text |
@@ -133,7 +135,18 @@ Custom fonts are one family per weight, so **never set `fontWeight` next to a `f
 - `Panel` (`panel.tsx`) — bolted module: chassis fill, `card` shadow (`elevated` → `floating`),
   corner `Screw`s 12pt from each edge (on by default), optional `Vents`.
 - `DataInput` (`data-input.tsx`) — recessed mono well, 56pt min height, accent focus
-  "backlight" ring, `danger` ring on error, optional `suffix`. `AuthField` = label + DataInput + error.
+  "backlight" ring, `danger` ring on error, optional `suffix`, `multiline`. Takes `ref` (to
+  focus it) and `onNext` (keyboard "Next" → next field; on iOS number pads, which have no return
+  key, an accessory bar with Next / Done). Scrolls itself into view inside a
+  `KeyboardRevealContext` provider.
+- `Field` (`field.tsx`, was `auth-field.tsx`/`AuthField`) — stamped label + `DataInput` + error,
+  with an optional `suffix` unit string. Every form field in the app uses it.
+- `Chip` (`chip.tsx`) — pick-one option: a latching `Key` with an indicator LED (always
+  present, lit when selected, so widths never jump). Room types, units, labour rates, and the
+  sign-up account type.
+- `StepProgress` — a recessed pipe filled with accent up to the current step, one LED node per
+  step (current one pulses), plus the "Step N of 5 · Name" legend.
+- Corner radius scale: `Radius.sm/md/lg/xl/full` only (the `control`/`sheet` aliases are gone).
 - `Led` (`led.tsx`) — status light with mono legend; `accent` / `success` / `warning` / `off`,
   optional `pulse`. Always labelled, so status is never colour-only.
 - `Divider` — now a machined groove (dark upper lip, lit lower lip), not a hairline.
@@ -184,6 +197,42 @@ Icons: `lucide-react-native` (installed, first used in section 3/4).
     Logic untouched.
   - Native tab bar tinted only (still `NativeTabs`): chassis background, accent icon when
     selected, Inter labels. Now reads colours via `useTheme()` instead of its own lookup.
+- **2026-09-18:** **Redesign section 4 — the quote wizard.** Maintainer asked for sections 4
+  and 5 back-to-back with one device test at the end.
+  - Chrome: pipe `StepProgress`; the ✕ glyph is now a round chassis `Key` with a lucide `X`
+    (and no longer uses negative margins against the safe area).
+  - Dimensions: `Chip`s for room type and units; length/width/height are `Field`s on a
+    `Panel`; floor area lights up on a `Readout` inside that panel.
+  - Photo: the dashed dropzone is a tappable viewfinder `Readout` (whole screen is a ghost
+    key); "added" shows a green LED on the glass. **Copy change:** "Choose from library" →
+    "Library" — the uppercase legend wrapped at half width.
+  - Materials: brief/ZIP are `Field`s (brief multiline); packages are hanging price-tag
+    panels (punched hole, no screws); selected = accent backlight ring + lit **SELECTED** LED;
+    buy links get a lucide external-link glyph.
+  - Labour: round −/+ keys either side of a recessed counter window; rate `Chip`s; custom rate
+    `Field` (`/ day` suffix); total on a `Readout` with its own `$` (standalone figure).
+  - Summary: receipt = one vented panel with groove dividers; grand total on a `Readout`
+    legend "Estimate · USD"; "Mark as final" switch now tracks accent (a toggle is
+    interactive) with an amber/green LED stating what will be saved.
+  - **The one-accent-per-screen rule is retired** — under this system the accent marks every
+    interactive/active thing (primary key, lit LEDs, progress, selection). The old
+    "Materials shows two accents" open item is therefore closed.
+- **2026-09-18:** **Keyboard: Next-field chaining + auto-scroll in the wizard** (maintainer
+  report: the keyboard covered Width/Height on Dimensions).
+  - `react-native-keyboard-controller` was the obvious tool but **is not in Expo Go**, so this
+    is core RN only. `DataInput` takes `ref` + `onNext`: Android's action key becomes "Next";
+    iOS number pads (which have no return key) get an `InputAccessoryView` bar with
+    **Next** / **Done** keys. Every iOS numeric field now gets that bar (Done), so decimal
+    pads can finally be dismissed.
+  - `QuoteStepScreen` provides `KeyboardRevealContext`: a focused field is scrolled to ~88pt
+    below the top, and the content gets keyboard-height bottom padding so the last fields can
+    get there. `keyboardDismissMode="interactive"` added. Applies to every wizard step.
+  - Dimensions chains Length → Width → Height (Done).
+- **2026-09-18:** **Redesign section 5 — cleanup.** Launch overlay and native splash now use
+  the chassis colour (`app.json` gets a `dark` splash background); tokens nothing uses any
+  more removed (`surface`, `onInk`, `Radius.control`/`sheet`) along with the unused
+  `ButtonRow`; `AuthField` renamed `Field`; web top bar gets the LED nameplate. Splash
+  *image* and app icon are still Expo's — branding remains deferred.
 
 - **2026-09-18:** **Upgraded SDK 54 → 57, and migrated off react-navigation rather than
   suppressing the check.** Not a chosen upgrade — Expo Go auto-updated itself on the
@@ -417,8 +466,8 @@ Icons: `lucide-react-native` (installed, first used in section 3/4).
 - [x] **Offline cold launch explains itself on the login screen** (2026-08-16, device-verified)
 - [x] **Expo SDK 54 → 57**, migrated off react-navigation (2026-09-18, static checks only)
 - [x] **Lint and typecheck both clean** under the SDK 57 React Compiler rules (2026-09-18)
-- [ ] **Industrial Skeuomorphism redesign** — sections 1–3/5 (foundation, auth, tabs) done 2026-09-18
-  (typecheck, lint, iOS+Android `expo export` clean; not yet seen on device)
+- [x] **Industrial Skeuomorphism redesign** — all 5 sections built 2026-09-18 (typecheck,
+  lint, iOS + Android + web `expo export` clean). Sections 1–3 device-verified; **4–5 not yet**
 
 ### Verification state (updated 2026-09-18)
 
@@ -461,18 +510,41 @@ inset, and the Quotes tab — have all now been exercised on a device. Nothing f
 list is outstanding.
 
 **Still unverified:** redesign **section 4** (quote wizard chrome + the five steps) and
-**section 5** are not built yet; the wizard currently renders with the new tokens over the
-old layouts, which is the expected intermediate state, not a regression. Web has not been
-re-checked since the redesign began.
+**section 5** (splash colours, token cleanup) — built after the smoke test above, typecheck /
+lint / 3-platform `expo export` only. Web has not been re-checked in a browser since the redesign began (static export renders).
+
+### Redesign — device checks still owed (2026-09-18)
+
+For sections 4–5: walk the whole wizard (Dimensions → Photo → Materials → Labour → Summary →
+Done), in light and dark mode. Most likely to need tuning on a real phone:
+shadow strength/blur (especially **dark mode** and Android), custom fonts in the **native tab
+bar** labels, the `Key` press transition (Reanimated CSS `boxShadow` interpolation — if it
+doesn't interpolate it will simply snap, which is acceptable), `adjustsFontSizeToFit` on
+readout figures.
+
+**Keyboard fix (2026-09-18, after the maintainer reported the keyboard covering Width/Height)
+— owed on both platforms:**
+
+1. Dimensions: tap Length, type, press **Next** → Width slides up above the keyboard → Next →
+   Height → **Done** closes it. On iOS the Next/Done keys are the bar above the number pad;
+   on Android they're the keyboard's own action key.
+2. Materials brief / ZIP, Labour custom rate, Summary name — each scrolls clear when tapped;
+   iOS ZIP and rate show the Done bar.
+3. Drag the page down with the keyboard up — it should follow and close.
+
+Watch for: the reveal landing too high/low (tune `REVEAL_OFFSET` in `quote-step-screen.tsx`),
+and whether Android (edge-to-edge, SDK 57) *also* resizes the window — if so there will be
+double the empty space below the footer while typing (harmless, but drop the padding on
+Android if it looks wrong).
 
 ### Known open UI items
 
-- **Materials shows two accent elements at once** (progress bar + selected tier card) —
-  both are sanctioned uses, but it breaks the one-per-screen rule. Undecided: neutralise
-  the progress bar on step 3, or accept it.
+- ~~**Materials shows two accent elements at once**~~ — moot: the redesign retired the
+  one-accent-per-screen rule (2026-09-18).
 - **App identity is still Expo's** — icon, splash, favicon, the Quotes tab icon, and
   `app.json` `slug`/`scheme` (`"mobile"`). A branding pass was explicitly deferred.
-- **Sign-out button overlaps the web tab bar** (web only; fine on native).
+- **Sign-out button overlaps the web tab bar** (web only; fine on native). Not re-checked
+  since the Home redesign moved Sign out into the nameplate row.
 - ~~**`npx tsc --noEmit` fails with 6 errors in `src/components/app-tabs.tsx`**~~
   **Fixed by the SDK 57 upgrade (2026-09-18).** The errors were a types/API-shape mismatch:
   `NativeTabs.Trigger.Label`/`.Icon` didn't exist on `expo-router@6.0.24`'s types, which

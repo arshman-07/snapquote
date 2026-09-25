@@ -67,7 +67,7 @@ Two audiences, one flow, tailored by a **contractor / homeowner choice at sign-u
 - [x] Project vision & stack decided
 - [x] Documentation structure created
 - [x] Phase 1: frontend placeholder shell — all five flow screens built (Dimensions, Photo, Materials, Labour, Summary), walking end-to-end (2026-06-29)
-- [~] Phase 2: Directus integration — **feature-complete, pending on-device verification.**
+- [x] Phase 2: Directus integration — **closed 2026-09-24.**
   Backend live (Directus **11.13.4** + Postgres via Docker Compose; downgraded from 12 on
   2026-07-13 for free row-level permissions, see
   [directus-11-downgrade.md](./directus-11-downgrade.md)).
@@ -80,10 +80,11 @@ Two audiences, one flow, tailored by a **contractor / homeowner choice at sign-u
   **Offline behaviour behind the gate closed 2026-08-16** (OQ #7): the fallbacks were
   verified on-device and a cold launch with no server now explains itself instead of
   showing a login form that can't succeed.
-  **Remaining before Phase 2 closes:** decide email verification; server-side payload
-  validation (§2.5); and device-verify the rest of the 2026-07-27 UI work — the new-quote
-  wizard was exercised on 08-16, but **quote editing, deletion and the flow-exit ✕ still
-  have not run** (see FRONTEND.md “Verification state”). The emptied v12 service on `:8055`
+  **Server-side payload validation live 2026-09-24:** `quote-payload-validator`
+  deployed to the devbox and the permission suite is green at **69/69** including
+  Group G (SECURITY.md §2.5, §3.1). That was the last item holding the phase open.
+  Email verification is **deferred by decision** (OQ #13) rather than blocking the phase.
+  Quote editing, deletion and the flow-exit ✕ were **device-verified 2026-09-18**. The emptied v12 service on `:8055`
   is **staying up by decision (2026-08-16)**, so SECURITY.md §0 stays open rather than
   blocking the phase.
 - [ ] Deferred: **branding pass** — app icon, splash, favicon, tab icon and `app.json`

@@ -79,7 +79,9 @@ The endpoint returns the shape the frontend already renders (mirrored in
 - [x] **Extensions deployed** (2026-07-26) — `quote-item-owner-guard` (the
       `quote_items` ownership guard) lives at `~/directus/extensions/` on the
       devbox, mounted into the `directus11` container via `docker-compose.yml`;
-      load confirmed in the container logs. Source + deploy steps:
+      load confirmed in the container logs. `quote-payload-validator` (server-side
+      value checks on `quotes`/`quote_items`) joined it on **2026-09-24**, verified
+      by probe Group G. Source + deploy steps:
       [`directus/README.md`](../directus/README.md). **Redeploy after editing
       the extension in this repo — the container copy is what runs.**
 
@@ -259,7 +261,10 @@ pm2 keeps it alive across reboots.
 - [ ] ⚠️ **Phase 2 tail: stop the emptied v12 service on `:8055`** — still running with
       public registration enabled. Oldest outstanding item; closes SECURITY.md §0.
       (Done long ago: `labour_rates` seeded, frontend on v11 `:8056`, v12 data emptied.)
-- [ ] Phase 2 tail: decide email verification at sign-up (needs a mail transport on the server)
+- [~] Phase 2 tail: email verification at sign-up — **deferred 2026-09-18, and
+      Phase 2 closes without it** (OPEN-QUESTIONS #13). Needs an SMTP transport
+      on the devbox before any of it can be built, which is server setup rather
+      than app work. Unverified emails remain possible until it's revisited.
 - [ ] Phase 2 tail: server-side payload/value validation (SECURITY.md §2.5) — the one
       unticked row in the §3.1 matrix; permissions cover *who touches what*, not *what
       values* they write

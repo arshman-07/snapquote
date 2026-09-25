@@ -45,7 +45,9 @@ Expo Router with file-based routing. The root `_layout.tsx` is a `Stack` (wrappe
 Route groups (`(tabs)`, `(quote)`) don't appear in the URL, so the tab paths stay `/` and `/explore`.
 The quote flow shares one draft via `QuoteDraftProvider` (`src/context/quote-draft.tsx`) — each step
 reads/writes the same `QuoteDraft` instead of threading params. Derived values (area, materials/labour
-totals) live alongside it. Shared flow UI: `quote-step-screen`, `step-progress`, `step-footer`. The
+totals) live alongside it. Shared flow UI: `quote-step-screen`, `step-progress`, `step-footer`.
+`quote-step-screen` also provides `KeyboardRevealContext` (focused inputs scroll clear of the
+keyboard); chain fields with `ref` + `onNext` on `Field`/`DataInput`. The
 Materials step's tiered packages come from `src/constants/materials-mock.ts`, a Phase-1 mock shaped to
 the eventual Directus response (swapped for the real call in Phase 3 without UI changes).
 
@@ -69,7 +71,9 @@ Design direction is **Industrial Skeuomorphism** (neumorphic, top-left lit; see
 - `Spacing`, `Radius` (`sm`…`xl`, `full`), `Motion` (sprung press curve), `BottomTabInset`, `MaxContentWidth`
 
 Use `useTheme()` / `useShadows()` (`src/hooks/use-theme.ts`). Build pressables on `Key`
-(`components/button.tsx`), panels on `Panel`, inputs on `DataInput`, status on `Led`.
+(`components/button.tsx`), pick-one options on `Chip`, panels on `Panel`, labelled inputs on
+`Field` (raw slot: `DataInput`), status on `Led`, backlit figures on `Readout`. Icons come
+from `lucide-react-native`.
 `ThemedText` (`tabular` = mono figures) and `ThemedView` are the styled text/view primitives.
 
 ### Navigation

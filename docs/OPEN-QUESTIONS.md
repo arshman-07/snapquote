@@ -71,6 +71,18 @@ decisions into the relevant task docs.
 12. **What does "show the customer" mean** — in-app screen only (today), PDF, or a
     shareable link?
 
+13. **Email verification at sign-up.** ✅ **Deferred 2026-09-18 — Phase 2 closes
+    without it.** Directus public registration creates a usable account from any
+    address, verified or not. Building it needs an SMTP transport configured on
+    the devbox (`EMAIL_TRANSPORT`, `EMAIL_SMTP_*`) before a single line of app
+    code is worth writing, and that is server setup rather than frontend work.
+    Weighed against the alternative — holding Phase 2 open on an infrastructure
+    task with no mail provider chosen — deferring was the call.
+    **What this leaves open:** unverified and typo'd addresses can register, so
+    account recovery and any future email to users are both unreliable. Revisit
+    together with password reset, which needs the same transport, and with
+    OPEN-QUESTIONS #12 if quotes ever become shareable by link.
+
 ---
 
 ## Phase 3 — AI material + photo estimation

@@ -344,9 +344,26 @@ Rejected alternatives:
 
 - ✅ **Client-side validation** via RHF + zod (`src/lib/quote-schema.ts`) with
   unit-aware bounds.
-- ❓ **Server-side validation** — client zod is UX, not security. Directus field
-  validation rules on `quotes`/`quote_items` (numeric ranges, required fields,
-  max lengths on free text) so a raw API client can't insert garbage.
+- ✅ **Server-side validation** — built 2026-09-18, **deployed and verified live
+  2026-09-24** (probe run 69 passed / 0 failed, Group G all green).
+  `directus/extensions/quote-payload-validator` is a hook extension on
+  `quotes`/`quote_items` create+update: unit-aware dimension bounds copied from
+  `src/lib/quote-schema.ts`, enum checks on `unit`/`status`/`selected_tier`/
+  `kind`, money bounded to 0…100M, text caps on every free-text column, and
+  `grand_total == materials_total + labour_total` (±0.01). Rejects with a 400
+  `FAILED_VALIDATION`.
+  - **Why a hook, not Directus field validation rules.** Field rules are
+    per-field, so the cross-field invariants (unit-aware bounds, totals
+    agreeing) don't fit — and they live only in the database. This schema has
+    been hand-rebuilt once already and silently lost config both times it
+    happened (`date_created`, then the empty field-read lists). Code in the repo
+    survives a rebuild; admin-clicked rules don't.
+  - **The risk is over-blocking, not under-blocking.** An earlier draft also
+    required `length`/`width` on create and would have rejected the minimal rows
+    `probe-permissions.sh` creates for its own setup. Both verification layers
+    (§3.1 Group G, §3.3) lead with accept cases for that reason.
+  - ⚠️ The container copy is what runs: after editing the extension in the
+    repo, copy it to the devbox and restart Directus again, then re-run Group G.
 - ❓ **Displayed-data hygiene** — quote briefs / customer names are free text
   that comes back and renders in the app (and later maybe in a PDF/shareable
   link — OPEN-QUESTIONS #12, where injection starts to matter).
@@ -403,6 +420,15 @@ Both gaps had let a real defect sit at a green 35/35:
   exactly that. Now: two Read probes using the app's real field sets
   (`useRecentQuotes`, `useQuote`), plus one Update probe per field the wizard
   writes. Keep the field list in step with `buildQuotePayload()`.
+- **Payload validation (Group G, added 2026-09-18).** Every probe before this
+  checked *who* may write *where*; none checked *what values* landed. Now: two
+  accept rows (a full wizard payload and a minimal `job_type`+`unit` row) that
+  must stay **200**, then twelve deny rows — bad enums, negative and
+  disagreeing totals, out-of-range dimensions, oversized free text, a bad line
+  amount — that must be **400**. A **200** on a deny row means the
+  `quote-payload-validator` extension isn't loaded, not that the rule is wrong.
+  The accept rows lead deliberately: a validator that only ever denies would
+  pass all twelve and still break every save.
 - **Cross-user item read (Group C isolation).** Every earlier probe only checked
   that cross-user *creation* was blocked, never cross-user *reading* — which is
   how the `quote_items` scoping bug survived. Now B plants an item on B's own
@@ -436,9 +462,9 @@ now purpose-created and removed in a cleanup step; a full run is net zero rows.
       `full_name` / `user_type` succeed without opening any escalation path.
       `company_name` is granted by the same field-limited permission but is not
       individually probed.
-- [ ] Oversized / out-of-range / wrong-type payloads direct to the API — verify
-      server-side validation once added (§2.5). **The remaining gap in §3.1:**
-      the matrix covers *who* can touch *what*, not *what values* they can write.
+- [x] Oversized / out-of-range / wrong-type payloads direct to the API — Group G,
+      **verified live 2026-09-24** against the deployed validator (§2.5): 2 accept
+      rows 200, 12 deny rows 400; full run 69 passed, 0 failed.
 
 ### 3.2 Secret & dependency hygiene (automatable now)
 
@@ -454,6 +480,23 @@ now purpose-created and removed in a cleanup step; a full run is net zero rows.
 - [ ] Logout (if built) clears secure store and the TanStack Query cache.
 - [ ] App behaves sanely when the API is unreachable (existing offline
       fallbacks) and when it returns 401/403/500.
+
+### 3.3b Payload-rule unit tests (automated, no server)
+
+```bash
+node scripts/test-payload-validator.mjs
+```
+
+Registers `quote-payload-validator` against a fake `filter` registry and runs
+44 payloads through the real handlers — no Directus, no network, no
+dependencies, non-zero exit on any failure. Roughly a third are "garbage that
+must be rejected"; the rest are **payloads that must still be accepted**,
+including the exact shapes `buildQuotePayload()` emits, the rename dialog's
+partial PATCH, and the minimal rows `probe-permissions.sh` creates.
+
+This is the fast inner loop. It proves the *rules*; it cannot prove the
+extension loaded, that field permissions allow the write, or anything about the
+running server — that's §3.1 Group G.
 
 ### 3.4 Later / bigger guns
 
@@ -483,3 +526,6 @@ the sections above.
   scoping is now in place (§2.2); §0's hole doesn't exist on v11 (App User has no
   `directus_users` access) but stays live on the legacy v12 instance at `:8055`
   until v12 is retired.
+- 2026-09-24 — **Server-side payload validation live** (§2.5).
+  `quote-payload-validator` deployed to the devbox; `probe-permissions.sh` 69
+  passed, 0 failed, closing the last open row in the §3.1 matrix.

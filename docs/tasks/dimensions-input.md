@@ -40,6 +40,14 @@ labour, and summary steps can size up the quote from them. Built on the shared f
       the Dimensions form is RHF-owned (seeded from the draft, `mode: 'onChange'`) and writes back
       to the shared draft only on a valid Continue. Unit-aware sanity bounds (ft/m) via a cross-field
       `superRefine`; per-field error text; height optional; Continue gates on `formState.isValid`.
+- [x] Keyboard flow (2026-09-18, not yet device-verified): Length → Width → Height via the
+      keyboard's **Next** (Android action key; iOS accessory bar above the number pad, which
+      has no return key), Height ends with **Done**. Each field scrolls clear of the keyboard
+      when focused (`KeyboardRevealContext` from the shared step chrome). Fixes the keyboard
+      covering Width/Height.
+- [x] Redesigned (2026-09-18, Industrial Skeuomorphism): room types / units are latching
+      `Chip`s; the three measurements are `Field`s on a `Panel`; floor area shows on a
+      `Readout` screen.
 - [ ] Feed dimensions into AI material estimation (Phase 3).
 
 ## Open questions

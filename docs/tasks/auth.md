@@ -44,8 +44,9 @@ matrix passes — **35 passed, 0 failed, 0 skipped** with `RUN_PROFILE_PROBES=tr
   transport on the server).
 - The emptied **v12 instance (8055) is still running** with registration enabled
   — stop the container to close out `SECURITY.md` §0.
-- Payload/value validation (`SECURITY.md` §2.5) is the one unticked row in the
-  §3.1 matrix: it covers *who* can touch *what*, not *what values* they write.
+- ~~Payload/value validation (`SECURITY.md` §2.5) is the one unticked row in the
+  §3.1 matrix.~~ **Closed 2026-09-24** — `quote-payload-validator` deployed and
+  probe Group G green.
 
 ## Implementation options (surveyed 2026-07-03)
 
@@ -111,9 +112,11 @@ which resolved OQ #1/#2 and reshaped this task:
 
 ## Checklist (once approach is approved)
 
-- [ ] **Pre-work:** re-test `$CURRENT_USER` row-level filters on the live
-      Directus 12 (create a test user, set `read` on `quotes` with
-      `user_created = $CURRENT_USER`, probe with two accounts)
+- [x] **Pre-work:** re-test `$CURRENT_USER` row-level filters — **resolved by
+      the v11 downgrade, verified 2026-07-21.** Row filters are free on
+      Directus 11, and an API probe with a fresh App User confirmed it reads
+      only its own quotes (OQ #6, `directus-11-downgrade.md`). The box stayed
+      unticked long after the work landed; ticked 2026-09-18.
 - [~] Enable Directus public registration into the App User role — **done
       2026-07-21** (verified against v11 by API: `/users/register` → 204, then
       login succeeds and the app lands signed-in). The `user_type`
@@ -257,7 +260,9 @@ which resolved OQ #1/#2 and reshaped this task:
       (empty field-read perms on `quotes`/`quote_items`, and a missing
       `date_created` column) that broke the recent-quotes list; both fixed
       2026-07-21 — see `directus-11-downgrade.md` and BACKEND.md.
-- [ ] Verify offline fallbacks still work behind the gate (OQ #7)
+- [x] Verify offline fallbacks still work behind the gate (OQ #7) — **done
+      2026-08-16**, device-verified with Directus stopped, and the cold-launch
+      gate above them fixed in the same pass (`ad3a84c`). Ticked 2026-09-18.
 - [x] Run the permission-probing checklist (SECURITY.md §3.1) after lockdown,
       including cross-user probing (user A must not read user B's quotes).
       **Closed 2026-07-26: full run with `RUN_PROFILE_PROBES=true` — 35 passed,
@@ -296,7 +301,9 @@ which resolved OQ #1/#2 and reshaped this task:
 
 ## Status
 
-- [~] In progress — options surveyed 2026-07-03. 2026-07-13: audience widened to
+- [x] **Done 2026-09-24** — payload validation deployed and verified live (see the
+      last entry below); email verification deferred by decision (OQ #13).
+      Options surveyed 2026-07-03. 2026-07-13: audience widened to
       homeowners; OQ #1/#2 resolved (per-user accounts, in-app sign-up,
       contractor/homeowner type at sign-up); authenticated SDK client +
       SecureStore adapter, auth context + gate, login screen, and logout all
@@ -330,3 +337,7 @@ which resolved OQ #1/#2 and reshaped this task:
       emptied v12 service was **deferred by the maintainer on 2026-08-16** — it
       stays running for now; SECURITY.md §0 remains open. Session invalidation on
       password change was checked 2026-07-27 and needs no work (SECURITY.md §2.3).
+      **2026-09-24:** `quote-payload-validator` **deployed to the devbox** and
+      verified live — `probe-permissions.sh` **69 passed, 0 failed**, Group G's two
+      accept rows 200 and all twelve deny rows 400. With email verification
+      deferred (OQ #13), that closes the task and Phase 2.

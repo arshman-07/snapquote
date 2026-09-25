@@ -89,3 +89,92 @@ Three rows matter:
 - `POST item onto own quote` — must stay **PASS** (200). This is the regression
   check: a guard that also blocks legitimate saves would break the app's
   `useSaveQuote`, and the deny probes alone wouldn't catch it.
+
+---
+
+## `extensions/quote-payload-validator`
+
+A second **hook extension**, closing `docs/SECURITY.md` §2.5. The owner guard
+answers *whose* rows you may touch; this one answers *what values* may go in
+them. Client-side zod (`src/lib/quote-schema.ts`) runs in the app, so a raw API
+client holding a valid App User token could still POST a quote with negative
+totals, a 10 MB brief, a bogus `status`, or a length of 1e308.
+
+Registered on `quotes.items.create/update` and `quote_items.items.create/update`.
+It mirrors the app's own contract rather than inventing a stricter one:
+
+| Rule | Detail |
+|---|---|
+| Dimension bounds | Copied from `BOUNDS` in `src/lib/quote-schema.ts`, unit-aware (ft vs m) |
+| Enums | `unit`, `status`, `selected_tier`, `kind` |
+| Money | `0 … 100,000,000` on every total and line amount |
+| Totals agree | `grand_total == materials_total + labour_total`, ±0.01 |
+| Text caps | `customer_name` 200, `job_type` 120, `material_zip` 20, `material_brief` 5000, `label` 300 |
+| Required on create | `unit` and `job_type` only |
+
+Two design rules are worth keeping in mind before changing it:
+
+1. **Never reject what the app considers valid.** A validator that blocks real
+   saves is a worse bug than the one it fixes — see the `customer_name` lesson
+   in `docs/BACKEND.md`, where one missing field permission broke every save.
+   This bit during development: an earlier draft also required `length`/`width`
+   on create, which would have rejected the minimal rows
+   `scripts/probe-permissions.sh` creates for its own setup.
+2. **Only judge what you were sent.** Directus PATCHes are partial — the rename
+   dialog sends `{customer_name}` alone — so every check is keyed on the field
+   being present, and the totals cross-check runs only when all three arrive
+   together.
+
+Deliberately *not* enforced: `labour_days × labour_day_rate == labour_total`.
+`getLabourTotal()` parses days with `parseFloat` while the payload stores
+`parseInt`, so a fractional day would make that identity false for a perfectly
+legitimate save.
+
+### No build step
+
+Same as the owner guard: hand-written ESM, `directus:extension.path` points
+straight at `index.js`, nothing to compile and no npm install. It imports
+nothing outside the extension context Directus hands it.
+
+### Deploy
+
+**Live since 2026-09-24** — deployed alongside the guard in
+`~/directus/extensions/` on the devbox, load confirmed in the container logs, and
+Group G green in the probe run (69 passed, 0 failed). To redeploy after an edit,
+same procedure as the guard above:
+
+```bash
+cp -r directus/extensions/quote-payload-validator /path/to/stack/extensions/
+docker compose restart directus     # or: pm2 restart directus
+```
+
+Then confirm it loaded — a missing line in the logs means the validator is
+**not running**, so treat it as a failure rather than a no-op:
+
+```bash
+docker compose logs directus | grep -i quote-payload-validator
+```
+
+### Verify
+
+Two layers, and both matter:
+
+```bash
+# 1. The rules themselves. No server, no network, no dependencies.
+node scripts/test-payload-validator.mjs
+
+# 2. The rules as actually enforced by the running server.
+BASE_URL=http://100.64.144.41:8056 \
+  EMAIL_A=… PASS_A=… EMAIL_B=… PASS_B=… \
+  bash scripts/probe-permissions.sh
+```
+
+The unit tests run anywhere and cover 44 cases, weighted towards the payloads
+that must still be **accepted**. `probe-permissions.sh` **Group G** is the live
+check; its first two rows are the regression guard:
+
+- `POST full valid wizard payload` and `POST minimal quote` — must be **200**.
+  A guard that only ever denies would pass every deny row below and still break
+  the app.
+- The twelve deny rows — must be **400**. A **200** here means the extension
+  didn't load, not that the rule is wrong.

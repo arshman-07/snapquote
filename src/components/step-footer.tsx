@@ -14,8 +14,8 @@ type StepFooterProps = {
 };
 
 // Shared bottom action row for the quote wizard. Keeps the primary call to
-// action identical on every step: an `ink` fill, never the accent — the
-// progress bar above is already the screen's one accent element.
+// action identical on every step: the red accent key (the one thing to press),
+// with a grey chassis "Back" key beside it from step 2 on.
 export function StepFooter({
   primaryLabel,
   onPrimary,
