@@ -150,6 +150,13 @@ const TIER_RECIPES: TierRecipe[] = [
   },
 ];
 
+// Conversion factors to canonical imperial units. TIER_RECIPES pricing is
+// entirely US-denominated (per sq ft / per linear ft / per gallon), so a
+// metric area/perimeter has to be converted before any dollar math runs —
+// the quantity strings shown to the user stay in whatever unit they picked.
+const SQFT_PER_SQM = 10.7639; // 1 m² = 10.7639 sq ft
+const FT_PER_M = 3.28084; // 1 m = 3.28084 ft
+
 // Build the three packages for the current job. Quantities are derived from the
 // floor area (and an estimated perimeter) so the numbers feel grounded.
 export function buildMaterialPackages(input: {
@@ -159,10 +166,19 @@ export function buildMaterialPackages(input: {
 }): MaterialPackage[] {
   const area = input.area && input.area > 0 ? input.area : 0;
   const areaUnit = input.unit === 'ft' ? 'sq ft' : 'm²';
-  // Rough perimeter from a square-ish room, for trim length.
+  // Rough perimeter from a square-ish room, for trim length. This stays in
+  // the user's chosen unit — it's what gets displayed on the trim line.
   const perimeter = area > 0 ? 4 * Math.sqrt(area) : 0;
-  // Paint coverage ~350 sq ft per gallon; always at least one.
-  const gallons = Math.max(1, Math.ceil(area / 350));
+
+  // Imperial equivalents used ONLY for pricing math below. For unit === 'ft'
+  // these factors are 1, so an imperial job's numbers are untouched.
+  const areaImperial = input.unit === 'm' ? area * SQFT_PER_SQM : area;
+  const perimeterImperial = input.unit === 'm' ? perimeter * FT_PER_M : perimeter;
+
+  // Paint coverage ~350 sq ft per gallon; always at least one. Gallons are a
+  // physical count of cans, not a unit-dependent label, so this must be
+  // derived from the imperial area regardless of the user's chosen unit.
+  const gallons = Math.max(1, Math.ceil(areaImperial / 350));
   const pricedAt = new Date().toISOString().slice(0, 10);
 
   return TIER_RECIPES.map((r) => {
@@ -171,7 +187,7 @@ export function buildMaterialPackages(input: {
         name: r.surface.name,
         explanation: r.surface.explanation,
         quantity: `${Math.round(area)} ${areaUnit}`,
-        price: Math.round(area * r.surface.pricePerArea),
+        price: Math.round(areaImperial * r.surface.pricePerArea),
         retailer: r.surface.retailer,
         url: r.surface.url,
       },
@@ -179,7 +195,7 @@ export function buildMaterialPackages(input: {
         name: r.prep.name,
         explanation: r.prep.explanation,
         quantity: `${Math.round(area)} ${areaUnit}`,
-        price: Math.round(area * r.prep.pricePerArea),
+        price: Math.round(areaImperial * r.prep.pricePerArea),
         retailer: r.prep.retailer,
         url: r.prep.url,
       },
@@ -195,7 +211,7 @@ export function buildMaterialPackages(input: {
         name: r.trim.name,
         explanation: r.trim.explanation,
         quantity: `${Math.round(perimeter)} ${input.unit}`,
-        price: Math.round(perimeter * r.trim.pricePerLength),
+        price: Math.round(perimeterImperial * r.trim.pricePerLength),
         retailer: r.trim.retailer,
         url: r.trim.url,
       },
