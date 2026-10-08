@@ -82,6 +82,9 @@ decisions into the relevant task docs.
     account recovery and any future email to users are both unreliable. Revisit
     together with password reset, which needs the same transport, and with
     OPEN-QUESTIONS #12 if quotes ever become shareable by link.
+    🚩 **Flagged for end of build (2026-10-08):** the maintainer will switch it on
+    on the devbox as a pre-launch step. Keep it on the launch checklist — don't
+    drop it, and don't build around it before then.
 
 ---
 

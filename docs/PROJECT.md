@@ -83,7 +83,8 @@ Two audiences, one flow, tailored by a **contractor / homeowner choice at sign-u
   **Server-side payload validation live 2026-09-24:** `quote-payload-validator`
   deployed to the devbox and the permission suite is green at **69/69** including
   Group G (SECURITY.md §2.5, §3.1). That was the last item holding the phase open.
-  Email verification is **deferred by decision** (OQ #13) rather than blocking the phase.
+  Email verification is **deferred by decision** (OQ #13) rather than blocking the phase;
+  🚩 flagged as an end-of-build devbox step (maintainer, 2026-10-08).
   Quote editing, deletion and the flow-exit ✕ were **device-verified 2026-09-18**. The emptied v12 service on `:8055`
   is **staying up by decision (2026-08-16)**, so SECURITY.md §0 stays open rather than
   blocking the phase.

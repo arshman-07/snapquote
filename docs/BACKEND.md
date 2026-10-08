@@ -265,6 +265,8 @@ pm2 keeps it alive across reboots.
       Phase 2 closes without it** (OPEN-QUESTIONS #13). Needs an SMTP transport
       on the devbox before any of it can be built, which is server setup rather
       than app work. Unverified emails remain possible until it's revisited.
+      🚩 **Flagged 2026-10-08:** maintainer enables it on the devbox at the end of
+      the build, before launch.
 - [ ] Phase 2 tail: server-side payload/value validation (SECURITY.md §2.5) — the one
       unticked row in the §3.1 matrix; permissions cover *who touches what*, not *what
       values* they write

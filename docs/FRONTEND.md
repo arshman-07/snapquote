@@ -198,7 +198,8 @@ Icons: `lucide-react-native` (installed, first used in section 3/4).
   - Native tab bar tinted only (still `NativeTabs`): chassis background, accent icon when
     selected, Inter labels. Now reads colours via `useTheme()` instead of its own lookup.
 - **2026-09-18:** **Redesign section 4 — the quote wizard.** Maintainer asked for sections 4
-  and 5 back-to-back with one device test at the end.
+  and 5 back-to-back with one device test at the end. **Sections 4–5 and the keyboard
+  Next-field fix passed the maintainer's on-device test (reported 2026-10-08).**
   - Chrome: pipe `StepProgress`; the ✕ glyph is now a round chassis `Key` with a lucide `X`
     (and no longer uses negative margins against the safe area).
   - Dimensions: `Chip`s for room type and units; length/width/height are `Field`s on a
