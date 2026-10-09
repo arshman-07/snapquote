@@ -52,9 +52,11 @@ Async **job row** inside Directus, built as an extension and deployed like
 1. **App creates a request:** `POST /items/estimate_requests` with job type,
    dimensions, unit, ZIP and brief. It returns at once with `status: pending`. Users can
    create and read only their own rows and can never write `status`/`result`.
-2. **Filter hook (blocking, on create):** per-user daily cap (OQ #11), cache lookup on
-   job type + ZIP + tier within ~7 days (OQ #8; a hit fills `result` and marks it
-   `done` with no AI call), and input validation reusing the validator's rules.
+2. **Filter hook (blocking, on create):** input validation reusing the validator's
+   rules, plus the per-user daily cap (OQ #11), **built but switched off until launch**.
+   **Caching (OQ #8) is per product price, not per estimate:** photos make every
+   estimate room-specific, so the action hook checks a ~7-day price cache (product +
+   ZIP area) before each search instead of reusing whole results.
 3. **Action hook (after commit):** calls the AI, one call per tier **in parallel**, and
    writes each tier into `result` as it lands (budget first, OQ #9). Then sets
    `status: done` (or `failed` + error), `priced_at` and token cost.

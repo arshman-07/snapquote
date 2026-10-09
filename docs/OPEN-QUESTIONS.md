@@ -98,9 +98,8 @@ decisions into the relevant task docs.
    decision because everything else hangs off it.
    ✅ **Decided 2026-10-08: async job row in Directus** — see BACKEND.md
    "Estimation architecture". The app creates an `estimate_requests` item and polls
-   it; Directus hooks do the AI call in the background. Also settles the shape of #8
-   (cache check in the create hook), #9 (progressive tiers) and #11 (per-user daily
-   cap counted from the same rows) — their details are still open.
+   it; Directus hooks do the AI call in the background. #8, #9 and #11 build on it
+   (details decided below).
 2. **Which AI model/provider**, and how does it do the price-grounding web-search /
    tool-use step? Budget per estimate matters: each quote fires 3 packages × N items.
    ✅ **Decided 2026-10-08 — free while building, paid at launch.** See BACKEND.md
@@ -159,13 +158,30 @@ decisions into the relevant task docs.
 8. **Cache key confirmation** — planned as `{ job type + ZIP + tier }` with ~7-day
    TTL. Does area belong in the key (est. quantities scale with area), or does the
    AI return per-unit quantities the app scales?
+   ✅ **Decided 2026-10-08: cache price lookups, not whole estimates.** Photos make
+   every estimate room-specific, so a whole-estimate cache keyed on job type + ZIP +
+   tier would hand one user's result to another. Instead, cache individual product
+   prices per ZIP area (e.g. "porcelain tile 12×24 near 30301 → $2.10/sq ft") for
+   ~7 days. Quantities are worked out fresh every time; repeat price searches (and
+   their Tavily credits) are skipped.
 9. **Latency UX** — an AI estimate with web search can take 10–30s. Loading screen
    with progress? Generate the three tiers progressively? What does the Materials
    step show meanwhile?
+   ✅ **Decided 2026-10-08:** three placeholder tier cards that fill in as each tier
+   lands (progressive tiers per #1), with a short status line ("Reading your
+   photos…", "Checking local prices…").
 10. **Failure fallback** — if the AI call fails, does the Materials step fall back to
     the current mock packages (clearly labelled), a manual-entry mode, or block?
+    ✅ **Decided 2026-10-08:** a clear error with **Try again**, plus a **manual
+    entry** fallback so the user can still finish the quote. **Never** show the mock
+    packages as if they were real.
 11. **Cost controls** — per-day estimate caps or rate limiting per user? Self-hosted
     Directus + a paid AI API means runaway usage is a real bill.
+    ❓🚩 **Cap is OFF during development; turn it on at launch (maintainer, 2026-10-08).**
+    The plan is ~10 estimates per user per day, counted from `estimate_requests`
+    rows, with retries after a failure not counted. Build it behind a config switch so
+    launch is a flip, not new code. Pre-launch checklist item, alongside email
+    verification (#13). Meanwhile the free tiers' own limits are the only brake.
 
 ---
 
