@@ -142,8 +142,14 @@ decisions into the relevant task docs.
 5. **Does the estimate use the job-type components idea** (`FUTURE.md`) — i.e. does
    Phase 3 wait for component checklists, or estimate whole-room from
    dimensions + brief first? (Recommended: whole-room first; components later refine it.)
+   ✅ **Decided 2026-10-08: whole-room first.** The estimate comes from dimensions +
+   brief + photo(s). Component checklists stay a `FUTURE.md` refinement and don't
+   block Phase 3.
 6. **ZIP-based regional pricing** — real (retailer API takes ZIP) or cosmetic at
    launch? The field is already captured.
+   ✅ **Decided 2026-10-08: ZIP as a search hint.** The ZIP goes into the estimate call
+   and the model is told to look for local prices. That makes it partly real at no extra cost.
+   Exact ZIP-level pricing only arrives with retailer APIs (#3, parked).
 
 ### Data & behaviour
 
