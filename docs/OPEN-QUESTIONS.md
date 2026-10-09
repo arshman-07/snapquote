@@ -128,8 +128,13 @@ decisions into the relevant task docs.
    quote. Flow: the app uploads to Directus files, `estimate_requests` references the
    file, and the extension sends it to the model. Dev rule from #2 applies: test
    photos only on Gemini's free tier.
-   **Still open:** required or optional; one photo or several; whether the photo
-   may adjust the user's dimensions or only inform materials, condition and prep.
+   **Details (decided 2026-10-08):**
+   - **Optional but encouraged.** No photo still gets a dimensions-only estimate,
+     clearly marked as less accurate.
+   - **Up to 3 photos** per estimate (different angles).
+   - **The photo informs materials and condition only:** material type, condition,
+     prep/demolition, tier picks. The user's dimensions stay the source of truth,
+     and the photo never changes or second-guesses them.
 5. **Does the estimate use the job-type components idea** (`FUTURE.md`) — i.e. does
    Phase 3 wait for component checklists, or estimate whole-room from
    dimensions + brief first? (Recommended: whole-room first; components later refine it.)
