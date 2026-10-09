@@ -110,6 +110,9 @@ decisions into the relevant task docs.
    or start with AI-estimated prices only (no live retailer link) and add affiliate
    links later? Affiliate approval processes take time — apply early if we want them
    at launch.
+   ❓ **Parked 2026-10-08 (maintainer's call).** Undecided; revisit later. Until then,
+   prices come from AI + web search (#2). If affiliate links are wanted at launch,
+   approval takes weeks, so don't leave it until the last minute.
 
 ### Scope
 
