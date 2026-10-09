@@ -120,6 +120,10 @@ decisions into the relevant task docs.
    a typical contractor labour cost (days and/or total) per job so homeowner users
    get a full project cost. Same call as materials, or separate? Feeds the response
    contract (#7). Numbered 3b to keep existing #4–11 references stable.
+   ✅ **Decided 2026-10-08: days and total, both as ranges** (e.g. "About 2–3 days,
+   $1,800–2,400"), returned in the **same call** as materials. It mirrors how
+   contractors price (days × daily rate) and tells homeowners how long the job runs.
+   Ranges because a single figure would look more precise than the estimate is.
 4. **Photo estimation MVP scope.** The Photo step is a placeholder. For launch: does
    the photo actually influence the estimate (vision model call), or is it attached
    to the quote for reference only? (Reference-only is a much smaller Phase 3.)
