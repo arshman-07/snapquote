@@ -96,6 +96,11 @@ decisions into the relevant task docs.
    Flow + webhook, or a small companion service (e.g. Node/Hono next to Directus in
    the same Compose file)? This was deferred in BACKEND.md; it's the first Phase 3
    decision because everything else hangs off it.
+   ✅ **Decided 2026-10-08: async job row in Directus** — see BACKEND.md
+   "Estimation architecture". The app creates an `estimate_requests` item and polls
+   it; Directus hooks do the AI call in the background. Also settles the shape of #8
+   (cache check in the create hook), #9 (progressive tiers) and #11 (per-user daily
+   cap counted from the same rows) — their details are still open.
 2. **Which AI model/provider**, and how does it do the price-grounding web-search /
    tool-use step? Budget per estimate matters: each quote fires 3 packages × N items.
 3. **Retailer/affiliate API choice** — Home Depot / Lowe's via Impact, Amazon PA-API,

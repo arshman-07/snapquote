@@ -42,8 +42,34 @@ The one piece Directus does not do natively. Hosting options:
 2. **Directus Flow** — trigger-based, calls an external AI service via webhook.
 3. **Companion microservice** — small separate service the frontend or Directus calls.
 
-> Decision on hosting deferred to Phase 3. The frontend never calls the AI directly — it
-> always goes through Directus.
+> The frontend never calls the AI directly — it always goes through Directus.
+
+### Estimation architecture (decided 2026-10-08)
+
+Async **job row** inside Directus, built as an extension and deployed like
+`quote-payload-validator`. Not yet built.
+
+1. **App creates a request:** `POST /items/estimate_requests` with job type,
+   dimensions, unit, ZIP and brief. It returns at once with `status: pending`. Users can
+   create and read only their own rows and can never write `status`/`result`.
+2. **Filter hook (blocking, on create):** per-user daily cap (OQ #11), cache lookup on
+   job type + ZIP + tier within ~7 days (OQ #8; a hit fills `result` and marks it
+   `done` with no AI call), and input validation reusing the validator's rules.
+3. **Action hook (after commit):** calls the AI, one call per tier **in parallel**, and
+   writes each tier into `result` as it lands (budget first, OQ #9). Then sets
+   `status: done` (or `failed` + error), `priced_at` and token cost.
+4. **Schedule hook (sweeper, ~every minute):** rows stuck `pending` for more than ~2 min
+   (e.g. Directus restarted mid-call) are retried, then marked `failed` after N attempts.
+5. **App polls** the row (TanStack Query `refetchInterval`, ~2 s) until it's `done` or
+   `failed`. Directus realtime can replace polling later. Closing the app doesn't
+   lose the result.
+
+**Rejected:** synchronous endpoint and streaming (a 10–30 s call breaks on a flaky
+phone connection), Flows (awkward for multi-step logic), companion service /
+serverless / EAS API routes (extra infra or vendor for no gain at this scale),
+durable-workflow services (overkill). **Upgrade path:** if the sweeper proves shaky,
+swap in `pg-boss` on the existing Postgres. That's a server-only change and the app
+contract stays the same.
 
 ### Approach (decided 2026-06-27)
 
@@ -270,5 +296,6 @@ pm2 keeps it alive across reboots.
 - [ ] Phase 2 tail: server-side payload/value validation (SECURITY.md §2.5) — the one
       unticked row in the §3.1 matrix; permissions cover *who touches what*, not *what
       values* they write
-- [ ] Phase 3: AI material estimation endpoint
+- [ ] Phase 3: AI material estimation endpoint (architecture decided 2026-10-08: async
+      `estimate_requests` job row, see "Estimation architecture")
 - [ ] Phase 3: `materials` + `material_estimates` collections
