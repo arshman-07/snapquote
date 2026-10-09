@@ -71,6 +71,29 @@ durable-workflow services (overkill). **Upgrade path:** if the sweeper proves sh
 swap in `pg-boss` on the existing Postgres. That's a server-only change and the app
 contract stays the same.
 
+### Estimation model & price grounding (decided 2026-10-08, OQ #2)
+
+- **Provider-swappable.** The extension calls the AI only through one small
+  `estimate()` interface; the provider and model are config, not code.
+- **Development runtime: Gemini Flash (free tier) + Tavily search (free tier).**
+  Gemini's Google Search grounding isn't available without billing, so price
+  lookups go through Tavily (1,000 credits/month free, which is about 65 estimates/month at
+  roughly 15 searches each; cache hits stretch it). Cost: $0.
+- ⚠️ **Gemini's free tier uses prompts to improve Google's products.** Dev uses test
+  jobs only — never real user data on the free tier.
+- **Price grounding = AI + live web search** (approach B). Retailer/affiliate APIs
+  (OQ #3) can replace the search step later without touching the job-row design.
+- **Launch model: chosen later** by running the same 10 sample jobs through the
+  candidates (cheaper API models; Claude Sonnet 5 / paid Gemini as the bar) and
+  comparing quantity accuracy, price accuracy and cost per estimate. Launch runs on
+  a **paid tier**, for reliability and so user data isn't used for training.
+- Structured output in the `materials-mock.ts` shape; homeowner labour (OQ #3b)
+  rides in the same call as one extra field.
+- **Rejected for now:** local model on the devbox (GTX 1650 has only 4 GB of video memory: 3–4B
+  models are too weak, 7–8B spill into system RAM and compete with Directus, and it
+  still needs a search API). A Claude subscription can't power the backend (needs a
+  separately billed API key).
+
 ### Approach (decided 2026-06-27)
 
 - **Do NOT scrape retailer sites** — brittle, ToS-risky, gets blocked, and can't run from the

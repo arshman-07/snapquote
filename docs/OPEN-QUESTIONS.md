@@ -103,6 +103,9 @@ decisions into the relevant task docs.
    cap counted from the same rows) — their details are still open.
 2. **Which AI model/provider**, and how does it do the price-grounding web-search /
    tool-use step? Budget per estimate matters: each quote fires 3 packages × N items.
+   ✅ **Decided 2026-10-08 — free while building, paid at launch.** See BACKEND.md
+   "Estimation model & price grounding". Dev runs on Gemini Flash (free tier) +
+   Tavily search (free tier); the launch model is picked later from a 10-job test.
 3. **Retailer/affiliate API choice** — Home Depot / Lowe's via Impact, Amazon PA-API,
    or start with AI-estimated prices only (no live retailer link) and add affiliate
    links later? Affiliate approval processes take time — apply early if we want them
