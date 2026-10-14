@@ -210,6 +210,21 @@ The starting point, so we know what we're fixing:
     SET NULL can't be read from the client, and under SET NULL the orphans would
     be permanently invisible (the read filter scopes through `quote.user_created`)
     and so unrecoverable from the app.
+- ✅ **`estimate_requests` / `price_cache` access (Phase 3 section 1, 2026-10-14).**
+  - Users create estimate jobs with input fields only, so they can't forge `status` or
+    `result`.
+  - They read only their own rows, without the cost log.
+  - They can't update or delete them.
+  - `price_cache` is closed to everyone but admin.
+  - Verified by probe Group H (§3.1).
+- ❓ **Photo file ownership on `estimate_requests` (open, for section 2).** `photos` is a
+  JSON list of file ids, so Directus doesn't check that the files belong to the caller.
+  This is the same kind of gap as `quote_items` create (§2.2a). Section 2's filter hook
+  must confirm each id is the caller's own upload before the AI ever sees it, or a user
+  could get someone else's photo described back to them.
+- ❓ **Foreign estimate link on `quotes` (open, for section 2).** Once `quotes` Create/Update
+  grant `estimate_request`, the payload validator must reject an estimate id the caller
+  doesn't own. Not exploitable today because those fields are Read-only.
 - ❓ **Admin account hygiene** — strong unique password on the Directus admin,
   admin UI not exposed beyond LAN/Tailscale, static admin tokens avoided.
 
@@ -465,6 +480,14 @@ now purpose-created and removed in a cleanup step; a full run is net zero rows.
 - [x] Oversized / out-of-range / wrong-type payloads direct to the API — Group G,
       **verified live 2026-09-24** against the deployed validator (§2.5): 2 accept
       rows 200, 12 deny rows 400; full run 69 passed, 0 failed.
+- [x] Estimation job rows and price cache — **Group H, added and passed 2026-10-14**.
+      Unauthenticated create is 403. Create with inputs only is 200, but setting `status` or
+      `result` is 403. The own-row poll read is 200, an explicit cost-log read is 403, and
+      `fields=*` leaves the cost log out. Update/delete on an own row is 403. B's row is
+      invisible to A by id and in the list. `price_cache` read/create is 403. The new `quotes`
+      fields read back. **Caveat:** App Users can't delete estimate rows, so each run leaves
+      2 `job_type = "probe"` rows. Once section 2's hooks exist, those rows will trigger real
+      AI calls, so the probes need a way around that first.
 
 ### 3.2 Secret & dependency hygiene (automatable now)
 

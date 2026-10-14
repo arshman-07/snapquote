@@ -206,6 +206,23 @@ pm2 keeps it alive across reboots.
   > row filter and the permission cache in one shot.
 - `quote_items` — id, kind (dropdown: material/labour), label (string), amount (float),
   quote (M2O → quotes; reverse O2M `quote_items` on quotes).
+- **Phase 3 section 1 (built by hand and verified 2026-10-14).** Field-by-field specs are in
+  [`tasks/directus-estimate-setup.md`](tasks/directus-estimate-setup.md).
+  - `estimate_requests`: the AI estimation job row (see "Estimation architecture"). UUID `id`,
+    `date_created`, `user_created` (Save Current User ID), `status` (dropdown
+    pending/done/failed, default pending), inputs `job_type`, `length`, `width`, `height`
+    (nullable), `unit` (ft/m), `brief`, `zip`, `photos` (JSON array of file ids), output
+    `result` (JSON), `error`, and server-only bookkeeping `attempts` (default 0),
+    `last_attempt_at` (for the sweeper; not in the v1 contract), `model`, `tokens_in`,
+    `tokens_out`, `searches`. No hooks yet, so new rows stay `pending`.
+  - `price_cache`: per-product price cache (OQ #8). Auto-increment `id`, `product_key`,
+    `zip3`, `unit_price`, `retailer`, `url`, `checked_at`. Server-only. There's no composite
+    unique key (the admin can't make one), so the hook looks up before writing.
+  - `quotes` gained `estimate_request` (M2O → `estimate_requests`, nullable, no reverse
+    field) and `labour_total_min` / `_max`, `grand_total_min` / `_max` (float, nullable).
+    The 24 existing rows were backfilled with min = max = the current value; rows with null
+    totals stay null. The old `labour_total` / `grand_total` columns are still written by
+    the app and get removed once the frontend switches to the ranges.
 - `directus_users` (custom fields, **added on the server 2026-07-26**) — `user_type`
   (string, dropdown: `contractor` / `homeowner`, nullable), `full_name` (string,
   nullable), `company_name` (string, nullable). Set once at sign-up: homeowner →
@@ -263,6 +280,22 @@ pm2 keeps it alive across reboots.
   `email` and `password` all 403, while `full_name` and `user_type` succeed, and
   `GET /users` self-filters to the caller. The post-sign-up `updateMe` call now
   persists instead of 403ing (it was best-effort until this landed).
+- **Phase 3 section 1 permissions (2026-10-14), App User:**
+  - **`estimate_requests` Create:** field-limited to the 8 inputs (`job_type`, `length`,
+    `width`, `height`, `unit`, `brief`, `zip`, `photos`). A payload that sets `status` or
+    `result` 403s.
+  - **`estimate_requests` Read:** `user_created equals $CURRENT_USER`, field-limited to 13
+    (`id`, `status`, the 8 inputs, `result`, `error`, `date_created`). The cost log and
+    retry fields are hidden.
+  - **`estimate_requests` Update / Delete / Share:** none.
+  - **`price_cache`:** no permissions for App User or Public.
+  - **`quotes` Read** gained the 5 new fields. Create/Update deliberately don't have them
+    yet: they land in section 2 with the validator rules that check them (totals add up
+    across both ends, and the linked estimate is the caller's).
+  - ⚠️ **The first permissions save didn't persist** (0 rows in `directus_permissions`),
+    so the API 403'd the whole collection even though the admin looked right. It was
+    redone and saved on the policy page. If a new permission seems to do nothing, check
+    that it was actually saved before debugging anything else.
 - ✅ **Row-level filters now work at no cost** — they were paywalled on self-hosted
   Directus 12 (the reason for the downgrade); on v11 they are free. Frontend-side
   user scoping is no longer the enforcement mechanism.

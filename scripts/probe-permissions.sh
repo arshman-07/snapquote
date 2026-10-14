@@ -298,6 +298,63 @@ VALID_MINIMAL="$(curl -s -H "Authorization: Bearer $TOKEN_A" "$BASE_URL/items/qu
 [[ -n "$VALID_MINIMAL" ]] && curl -s -o /dev/null -X DELETE -H "Authorization: Bearer $TOKEN_A" "$BASE_URL/items/quotes/$VALID_MINIMAL"
 
 echo
+echo "== Group H: estimate_requests / price_cache (Phase 3 section 1) =="
+# Users create estimate jobs with input fields only, read only their own rows
+# (without the server's cost log), and can never update, delete or touch the
+# price cache. App Users can't delete estimate rows, so each run leaves two
+# job_type="probe" rows behind; clear them from the admin now and then.
+ESTIMATE_INPUT='{"job_type":"probe","length":12,"width":10,"height":8,"unit":"ft","brief":"","zip":"","photos":[]}'
+probe "POST estimate (unauthenticated)"          403      POST "/items/estimate_requests"  none "$ESTIMATE_INPUT"
+probe "POST estimate, input fields only"         200      POST "/items/estimate_requests?fields=id" "$TOKEN_A" "$ESTIMATE_INPUT"
+# UUID primary key, so the id is a quoted string rather than a number.
+ESTIMATE_A="$(extract id < "$TMP")"
+# Server-owned fields aren't in the Create field list, so Directus rejects the
+# whole request. This is what stops a user forging a finished estimate.
+probe "POST estimate setting status"             403      POST "/items/estimate_requests" "$TOKEN_A" '{"job_type":"probe","length":1,"width":1,"unit":"ft","status":"done"}'
+probe "POST estimate setting result"             403      POST "/items/estimate_requests" "$TOKEN_A" '{"job_type":"probe","length":1,"width":1,"unit":"ft","result":{}}'
+
+if [[ -z "$ESTIMATE_A" ]]; then
+  printf '  \033[31mFAIL\033[0m  %-52s -> setup failed (A could not create)\n' "estimate read/write probes"; ((fail++))
+else
+  # The exact field set the app will poll (contract §2, user-visible part).
+  probe "READ own estimate (app poll fields)"    200      GET "/items/estimate_requests/$ESTIMATE_A?fields=id,status,job_type,length,width,height,unit,brief,zip,photos,result,error,date_created" "$TOKEN_A"
+  # Cost log is server-only: asking for it explicitly must be refused...
+  probe "READ own estimate's cost log fields"    403      GET "/items/estimate_requests/$ESTIMATE_A?fields=model,tokens_in" "$TOKEN_A"
+  # ...and a wildcard read must silently leave it out.
+  if curl -s -H "Authorization: Bearer $TOKEN_A" "$BASE_URL/items/estimate_requests/$ESTIMATE_A?fields=*" \
+       | grep -qE '"(tokens_in|tokens_out|model|searches|attempts)"'; then
+    printf '  \033[31mFAIL\033[0m  %-52s -> cost log leaked\n' "fields=* hides server-only fields"; ((fail++))
+  else
+    printf '  \033[32mPASS\033[0m  %-52s -> hidden\n' "fields=* hides server-only fields"; ((pass++))
+  fi
+  probe "PATCH own estimate (no Update)"         403      PATCH "/items/estimate_requests/$ESTIMATE_A" "$TOKEN_A" '{"status":"done"}'
+  probe "DELETE own estimate (no Delete)"        403      DELETE "/items/estimate_requests/$ESTIMATE_A" "$TOKEN_A"
+fi
+
+# Cross-user: B's estimate must be invisible to A, by id and in A's list.
+ESTIMATE_B="$(curl -s -X POST -H "Authorization: Bearer $TOKEN_B" -H 'Content-Type: application/json' \
+  -d "$ESTIMATE_INPUT" "$BASE_URL/items/estimate_requests?fields=id" | extract id)"
+if [[ -z "$ESTIMATE_B" ]]; then
+  printf '  \033[31mFAIL\033[0m  %-52s -> setup failed (B could not create)\n' "B's estimate invisible to A"; ((fail++))
+else
+  probe "GET B's estimate by id"                 403\|404 GET "/items/estimate_requests/$ESTIMATE_B" "$TOKEN_A"
+  if curl -s -H "Authorization: Bearer $TOKEN_A" "$BASE_URL/items/estimate_requests?limit=-1&fields=id" \
+       | grep -qF "$ESTIMATE_B"; then
+    printf '  \033[31mFAIL\033[0m  %-52s -> B visible to A\n' "A's estimate list excludes B's"; ((fail++))
+  else
+    printf '  \033[32mPASS\033[0m  %-52s -> hidden\n' "A's estimate list excludes B's"; ((pass++))
+  fi
+fi
+
+probe "GET price_cache (server-only)"            403      GET  /items/price_cache           "$TOKEN_A"
+probe "POST price_cache (server-only)"           403      POST /items/price_cache           "$TOKEN_A" '{"product_key":"x","zip3":"070","unit_price":1,"checked_at":"2026-01-01T00:00:00Z"}'
+probe "GET price_cache (unauthenticated)"        403      GET  /items/price_cache           none
+
+# New quotes fields are Read-only for now; Create/Update land with their
+# validator rules in section 2.
+probe "READ new quotes fields (estimate link, ranges)" 200 GET "/items/quotes?limit=1&fields=id,estimate_request,labour_total_min,labour_total_max,grand_total_min,grand_total_max" "$TOKEN_A"
+
+echo
 echo "== Cleanup =="
 # Remove the rows the probes created. Everything else the script touches is
 # either patched in place with harmless values or already deleted by the probe
