@@ -155,6 +155,10 @@ decisions into the relevant task docs.
 7. **`materials` / `material_estimates` schema** — to be shaped by the final AI
    response contract (mock in `src/constants/materials-mock.ts` is the draft
    contract). Confirm the contract before creating collections.
+   ✅ **v1 approved for now (2026-10-08):** `tasks/ai-material-estimation.md`
+   "Response contract". It replaces the `materials`/`material_estimates` plan with
+   `estimate_requests` + `price_cache`. Its last sub-question (homeowner total as a range) was decided 2026-10-14:
+   `_min`/`_max` columns on `quotes`.
 8. **Cache key confirmation** — planned as `{ job type + ZIP + tier }` with ~7-day
    TTL. Does area belong in the key (est. quantities scale with area), or does the
    AI return per-unit quantities the app scales?
